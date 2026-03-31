@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | ADEL Portrait System</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        display: ['Outfit', 'sans-serif'],
+                    },
+                    animation: {
+                        'fade-in-up': 'fadeInUp 0.6s ease-out forwards',
+                    },
+                    keyframes: {
+                        fadeInUp: {
+                            '0%': { opacity: '0', transform: 'translateY(20px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100;300;400;700;900&display=swap" rel="stylesheet">
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Leaflet Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <style>
+        .active-tab {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: #C16053 !important;
+        }
+        .tab-btn:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+    </style>
+</head>
+<body class="bg-[#FDFBF7] flex h-screen overflow-hidden font-display">
+
+    <!-- Fixed Sidebar Navigation -->
+    <aside class="w-24 lg:w-80 bg-[#1A1A1A] h-screen flex flex-col items-center lg:items-start py-12 transition-all duration-500 relative z-50 shadow-2xl">
+        <!-- Logo Branding -->
+        <div class="px-8 mb-20 flex items-center space-x-4">
+            <div class="w-10 h-10 bg-[#C16053] rounded-2xl flex items-center justify-center shadow-lg shadow-[#C16053]/20">
+                <i data-lucide="pencil" class="text-white w-5 h-5"></i>
+            </div>
+            <span class="hidden lg:block text-2xl font-black tracking-[0.2em] text-white">ADEL</span>
+        </div>
+        
+        <!-- Navigation Groups -->
+        <nav class="w-full flex-1 space-y-2 px-6 overflow-y-auto">
+            <p class="hidden lg:block text-[9px] font-black uppercase text-white/20 tracking-[0.3em] mb-6 px-4">Management</p>
+            
+            <button onclick="switchTab('booking-tab')" class="tab-btn active-tab w-full flex items-center justify-center lg:justify-start space-x-5 p-5 rounded-[2rem] transition-all duration-300 group text-white/50">
+                <i data-lucide="layout-grid" class="w-5 h-5 transition-colors"></i>
+                <span class="hidden lg:block font-black text-[10px] uppercase tracking-[0.2em]">Dashboard</span>
+            </button>
+            
+            <button onclick="switchTab('request-tab')" class="tab-btn w-full flex items-center justify-center lg:justify-start space-x-5 p-5 rounded-[2rem] transition-all duration-300 group text-white/50">
+                <i data-lucide="inbox" class="w-5 h-5 transition-colors"></i>
+                <span class="hidden lg:block font-black text-[10px] uppercase tracking-[0.2em]">Requests</span>
+            </button>
+            
+             <button onclick="switchTab('gallery-tab')" class="tab-btn w-full flex items-center justify-center lg:justify-start space-x-5 p-5 rounded-[2rem] transition-all duration-300 group text-white/50">
+                <i data-lucide="image" class="w-5 h-5 transition-colors"></i>
+                <span class="hidden lg:block font-black text-[10px] uppercase tracking-[0.2em]">Gallery Manager</span>
+            </button>
+
+            <div class="h-px bg-white/5 my-8 mx-4"></div>
+            <p class="hidden lg:block text-[9px] font-black uppercase text-white/20 tracking-[0.3em] mb-6 px-4">Insights</p>
+            
+            <button onclick="switchTab('history-tab')" class="tab-btn w-full flex items-center justify-center lg:justify-start space-x-5 p-5 rounded-[2rem] transition-all duration-300 group focus:outline-none text-white/50">
+                <i data-lucide="archive" class="w-5 h-5 transition-colors"></i>
+                <span class="hidden lg:block font-black text-[10px] uppercase tracking-[0.2em]">Archive</span>
+            </button>
+        </nav>
+
+        <!-- Sidebar Footer -->
+        <div class="px-6 w-full pt-10 border-t border-white/5">
+            <button onclick="logout()" class="w-full flex items-center justify-center lg:justify-start space-x-5 p-5 text-red-400/60 hover:text-red-400 hover:bg-red-400/5 rounded-[2rem] transition-all duration-300 bg-transparent border-none">
+                <i data-lucide="log-out" class="w-5 h-5"></i>
+                <span class="hidden lg:block font-black text-[10px] uppercase tracking-[0.2em]">Logout</span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- Content Engine -->
+    <main class="flex-1 h-screen overflow-y-auto relative flex flex-col">
+        
+        <!-- Sticky Contextual Header -->
+        <header class="sticky top-0 z-40 bg-white/60 backdrop-blur-3xl px-16 py-10 border-b border-gray-100/50 flex justify-between items-center w-full">
+            <div class="flex items-center space-x-4">
+                <i data-lucide="layout-dashboard" class="w-5 h-5 text-[#C16053]"></i>
+                <h1 id="tab-title" class="text-3xl font-black uppercase tracking-[0.5em] text-[#1A1A1A]">OVERVIEW</h1>
+            </div>
+            
+            <div class="text-right flex flex-col items-end border-l border-gray-100 pl-8">
+                <p id="dashboard-user-name" class="text-xs font-black uppercase tracking-[0.3em] text-[#C16053]">ADEL</p>
+                <p id="dashboard-user-role" class="text-[9px] text-[#1A1A1A] font-bold uppercase tracking-[0.4em] opacity-40">SUPER ADMIN</p>
+            </div>
+        </header>
+
+        <!-- Main Workspace -->
+        <div class="flex-1 p-8 lg:p-12 w-full overflow-y-auto">
+            
+            <!-- Dashboard/Stats Tab -->
+            <section id="booking-tab" class="content-tab space-y-12">
+                <div class="grid md:grid-cols-3 gap-8">
+                    <div class="bg-white p-8 rounded-3xl shadow-sm border border-gray-50 flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-black text-gray-300 uppercase tracking-widest mb-1">Total Requests</p>
+                            <h4 class="text-4xl font-black">12</h4>
+                        </div>
+                        <div class="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center text-[#1A1A1A]">
+                            <i data-lucide="folder" class="w-6 h-6"></i>
+                        </div>
+                    </div>
+                    <div class="bg-white p-8 rounded-3xl shadow-sm border border-gray-50 flex items-center justify-between">
+                         <div>
+                            <p class="text-xs font-black text-gray-300 uppercase tracking-widest mb-1">Active Projects</p>
+                            <h4 class="text-4xl font-black text-[#C16053]">03</h4>
+                        </div>
+                         <div class="w-12 h-12 bg-[#C16053]/5 rounded-2xl flex items-center justify-center text-[#C16053]">
+                            <i data-lucide="clock" class="w-6 h-6"></i>
+                        </div>
+                    </div>
+                    <div class="bg-white p-8 rounded-3xl shadow-sm border border-gray-50 flex items-center justify-between">
+                         <div>
+                            <p class="text-xs font-black text-gray-300 uppercase tracking-widest mb-1">Total Spent</p>
+                            <h4 class="text-4xl font-black">₱8.4k</h4>
+                        </div>
+                         <div class="w-12 h-12 bg-green-50 rounded-2xl flex items-center justify-center text-green-600">
+                            <i data-lucide="credit-card" class="w-6 h-6"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-[#1A1A1A] text-white p-12 rounded-[40px] flex flex-col md:flex-row items-center justify-between">
+                    <div class="space-y-4 text-center md:text-left">
+                        <h2 class="text-5xl font-black uppercase leading-tight font-display">Start Your Next<br>Masterpiece.</h2>
+                        <p class="text-white/60">Our current waitlist is short! Book now for delivery by end of week.</p>
+                        <button onclick="switchTab('request-tab')" class="bg-[#C16053] px-10 py-4 uppercase font-black tracking-widest text-sm hover:scale-105 transition-transform inline-block">Book Commission</button>
+                    </div>
+                    <div class="hidden md:block">
+                        <i data-lucide="palette" class="w-48 h-48 text-white/10"></i>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Booking Request Management Tab (ADMIN) -->
+            <section id="request-tab" class="content-tab hidden space-y-8 w-full">
+                <div class="bg-white p-10 lg:p-16 rounded-[4rem] shadow-2xl shadow-gray-100/50 border border-gray-50/50 w-full">
+                    <div class="flex justify-between items-center mb-16 px-4">
+                        <div class="space-y-1">
+                            <h2 class="text-2xl font-black uppercase tracking-[0.4em]">Current Requests</h2>
+                            <p class="text-[10px] uppercase font-bold text-gray-300 tracking-widest">Pending artist action</p>
+                        </div>
+                        <span class="text-[10px] font-black uppercase tracking-[0.3em] px-6 py-2 bg-yellow-50 text-yellow-600 rounded-full border border-yellow-100 shadow-sm">Reviewing Queue</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="border-b-2 border-gray-50 text-[11px] uppercase font-black tracking-[0.3em] text-gray-300">
+                                <tr>
+                                    <th class="py-6 px-4">Client Contact</th>
+                                    <th class="py-6 px-4">Meet-up</th>
+                                    <th class="py-6 px-4">Medium</th>
+                                    <th class="py-6 px-4">Reference</th>
+                                    <th class="py-6 px-4">Investment</th>
+                                    <th class="py-6 px-4 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="request-tbody" class="text-xs">
+                                <!-- Requests will be injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Gallery View Tab -->
+            <section id="gallery-tab" class="content-tab hidden space-y-12 w-full max-w-7xl mx-auto">
+                 <div class="flex flex-col md:flex-row justify-between items-center bg-white p-10 rounded-[3rem] shadow-sm border border-gray-50 gap-8">
+                    <div class="flex items-center space-x-6">
+                        <div class="w-16 h-16 bg-[#C16053]/5 rounded-3xl flex items-center justify-center text-[#C16053]">
+                            <i data-lucide="image" class="w-8 h-8"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-4xl font-black uppercase tracking-[0.2em] text-[#1A1A1A]">Curations</h2>
+                            <p class="text-[10px] font-black uppercase tracking-widest text-[#C16053] italic">Manage your public portfolio assets</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                         <button onclick="addArtworkModal()" class="bg-[#1A1A1A] text-white px-10 py-5 rounded-[2rem] text-[10px] font-black uppercase tracking-[0.3em] flex items-center space-x-4 hover:bg-[#C16053] transition-all shadow-xl hover:-translate-y-1">
+                            <i data-lucide="plus-circle" class="w-5 h-5"></i>
+                            <span>Upload New Piece</span>
+                         </button>
+                    </div>
+                </div>
+                
+                <div class="gallery-grid">
+                    <!-- Artworks injected here -->
+                </div>
+            </section>
+
+            <!-- History Tab -->
+            <section id="history-tab" class="content-tab hidden space-y-8 w-full font-display">
+                <div class="bg-white p-10 lg:p-16 rounded-[4rem] shadow-2xl shadow-gray-100/50 border border-gray-50/50 w-full">
+                    <div class="flex justify-between items-center mb-16 px-4">
+                        <div class="space-y-1">
+                            <h2 class="text-2xl font-black uppercase tracking-[0.4em]">Request History</h2>
+                            <p class="text-[10px] uppercase font-bold text-gray-300 tracking-widest">Completed and declined commissions</p>
+                        </div>
+                        <span class="text-[10px] font-black uppercase tracking-[0.3em] px-6 py-2 bg-gray-50 text-gray-400 rounded-full border border-gray-100 shadow-sm">Archive</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse font-display">
+                            <thead class="border-b-2 border-gray-50 text-[11px] uppercase font-black tracking-[0.3em] text-gray-300">
+                                <tr>
+                                    <th class="py-6 px-4">Client</th>
+                                    <th class="py-6 px-4">Medium</th>
+                                    <th class="py-6 px-4">Date</th>
+                                    <th class="py-6 px-4">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="history-list-body" class="text-xs">
+                                <!-- Dynamic History Content -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Scripts -->
+    <script src="js/main.js"></script>
+    <script src="js/dashboard-logic.js"></script>
+    <script>
+        lucide.createIcons();
+
+        function switchTab(tabId) {
+            // Hide all tabs
+            document.querySelectorAll('.content-tab').forEach(tab => {
+                tab.classList.add('hidden');
+                tab.classList.remove('animate-fade-in-up');
+            });
+
+            // Remove active state from all nav buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active-tab');
+            });
+            
+            // Show new tab
+            const targetTab = document.getElementById(tabId);
+            if(targetTab) {
+                targetTab.classList.remove('hidden');
+                setTimeout(() => targetTab.classList.add('animate-fade-in-up'), 10);
+            }
+            
+            // Update title
+            const titleMap = {
+                'booking-tab': 'DASHBOARD OVERVIEW',
+                'request-tab': 'REQUEST QUEUE',
+                'gallery-tab': 'GALLERY MANAGER',
+                'history-tab': 'ARCHIVE'
+            };
+            const titleEl = document.getElementById('tab-title');
+            if(titleEl) titleEl.textContent = titleMap[tabId] || 'ADMIN';
+            
+            // Highlight Button
+            const sidebarBtn = Array.from(document.querySelectorAll('.tab-btn')).find(btn => btn.getAttribute('onclick').includes(tabId));
+            if(sidebarBtn) sidebarBtn.classList.add('active-tab');
+
+            // Sync Data
+            if(tabId === 'gallery-tab' && typeof renderGallery === 'function') renderGallery();
+            if(tabId === 'booking-tab' && typeof renderAdminRequests === 'function') renderAdminRequests();
+        }
+
+        // Initialize First Tab
+        document.addEventListener('DOMContentLoaded', () => {
+             switchTab('booking-tab');
+        });
+    </script>
+</body>
+</html>
