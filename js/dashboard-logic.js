@@ -35,11 +35,34 @@ document.addEventListener('DOMContentLoaded', () => {
         let bookings = JSON.parse(localStorage.getItem('bookings') || '[]');
         
         // Update Stats
-        const totalReq = document.querySelector('#booking-tab h4:nth-of-type(1)');
-        if(totalReq) totalReq.textContent = bookings.length;
+        const totalReqEl = document.getElementById('total-requests-stat');
+        const galleryCountEl = document.getElementById('gallery-count-stat');
+        const revenueEl = document.getElementById('revenue-stat');
+
+        if(totalReqEl) totalReqEl.textContent = bookings.length;
         
-        const activeProj = document.querySelectorAll('#booking-tab h4')[1];
-        if(activeProj) activeProj.textContent = bookings.filter(b => b.status === 'accepted').length.toString().padStart(2, '0');
+        if(galleryCountEl) {
+            const gallery = JSON.parse(localStorage.getItem('gallery_data') || '[]');
+            galleryCountEl.textContent = gallery.length.toString().padStart(2, '0');
+        }
+        
+        if(revenueEl) {
+            // Include accepted and completed in revenue
+            const confirmed = bookings.filter(b => b.status === 'accepted' || b.status === 'completed');
+            const total = confirmed.reduce((sum, b) => {
+                // Handle various price formats (e.g. 1k, 500, etc)
+                let priceStr = b.price?.replace(/[₱,]/g, '') || "0";
+                let priceVal = 0;
+                if(priceStr.toLowerCase().includes('k')) {
+                    priceVal = parseFloat(priceStr.replace(/k/gi, '')) * 1000;
+                } else {
+                    priceVal = parseFloat(priceStr);
+                }
+                return sum + (isNaN(priceVal) ? 0 : priceVal);
+            }, 0);
+            
+            revenueEl.textContent = total >= 1000 ? `₱${(total/1000).toFixed(1)}k` : `₱${total}`;
+        }
 
         // Current Requests (Pending/Accepted)
         const currentBookings = bookings.filter(b => b.status === 'pending' || b.status === 'accepted').reverse();
@@ -77,7 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td class="py-10 px-4">
                         <div class="flex flex-col space-y-2">
                             <span class="font-bold text-sm">₱${book.price || (book.medium === 'digital' ? '2,200' : '1,500')}</span>
-                            <button onclick="viewPayment('${book.payment}')" class="text-[9px] uppercase font-black tracking-widest py-1 px-3 bg-[#1A1A1A] text-white rounded-md hover:bg-[#C16053] transition-colors w-fit tracking-[0.2em]">${book.payment}</button>
+                            <button onclick="viewPayment('${book.payment_receipt}', '${book.payment}')" class="text-[9px] uppercase font-black tracking-widest py-1 px-3 ${book.payment_receipt ? 'bg-green-600' : 'bg-[#1A1A1A]'} text-white rounded-md hover:bg-[#C16053] transition-colors w-fit tracking-[0.2em]">${book.payment}</button>
                         </div>
                     </td>
                     <td class="py-10 px-4 text-right">
@@ -105,12 +128,17 @@ document.addEventListener('DOMContentLoaded', () => {
                historyTable.innerHTML = `<tr><td colspan="4" class="py-12 text-center font-bold opacity-30 uppercase text-[10px] tracking-widest">Archive empty</td></tr>`;
             } else {
                 historyTable.innerHTML = historyBookings.map(book => `
-                    <tr class="border-b border-gray-50 opacity-60">
+                    <tr class="border-b border-gray-50 opacity-60 hover:opacity-100 transition-opacity">
                         <td class="py-8 px-4 font-bold uppercase tracking-widest text-[#1A1A1A]">${book.name}</td>
                         <td class="py-8 px-4 capitalize italic">${book.medium}</td>
-                        <td class="py-8 px-4 text-gray-400">${book.date}</td>
+                        <td class="py-8 px-4 text-gray-400 font-bold uppercase tracking-tighter">${book.date}</td>
                         <td class="py-8 px-4">
                             <span class="px-4 py-1 ${statusClass(book.status)} rounded-md text-[8px] font-black uppercase tracking-widest">${book.status}</span>
+                        </td>
+                        <td class="py-8 px-4 text-right">
+                             <button onclick="deleteHistoryEntry(${book.id})" class="p-2 text-red-500/30 hover:text-red-500 transition-colors">
+                                 <i data-lucide="trash-2" class="w-4 h-4"></i>
+                             </button>
                         </td>
                     </tr>
                 `).join('');
@@ -118,6 +146,54 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         lucide.createIcons();
     }
+
+    // Individual History Deletion
+    window.deleteHistoryEntry = (id) => {
+        let bookings = JSON.parse(localStorage.getItem('bookings') || '[]');
+        const entry = bookings.find(b => b.id === id);
+        
+        Swal.fire({
+            title: `Delete ${entry ? entry.name : 'Entry'}?`,
+            text: 'This will permanently erase this record from the archive.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#C16053',
+            cancelButtonColor: '#1A1A1A',
+            confirmButtonText: 'Yes, Erase'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                bookings = bookings.filter(b => b.id !== id);
+                localStorage.setItem('bookings', JSON.stringify(bookings));
+                renderAdminRequests();
+            }
+        });
+    };
+
+    // Bulk Archive Clearance
+    window.clearArchive = () => {
+        Swal.fire({
+            title: 'Wipe Archive?',
+            text: 'This will permanently remove all completed and declined commissions.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#C16053',
+            cancelButtonColor: '#1A1A1A',
+            confirmButtonText: 'Yes, Clear'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                let bookings = JSON.parse(localStorage.getItem('bookings') || '[]');
+                // Keep only active (pending/accepted) ones
+                bookings = bookings.filter(b => b.status === 'pending' || b.status === 'accepted');
+                localStorage.setItem('bookings', JSON.stringify(bookings));
+                renderAdminRequests();
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Archive Cleared',
+                    confirmButtonColor: '#1A1A1A'
+                });
+            }
+        });
+    };
 
     function statusClass(status) {
         switch(status) {
@@ -206,19 +282,80 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // 5. View GCash Receipt
-    window.viewPayment = () => {
+    window.viewPayment = (receiptData, method) => {
+        if(method !== 'gcash' || !receiptData || receiptData === 'null' || receiptData === '') {
+            Swal.fire({
+                icon: 'info',
+                title: 'No Digital Receipt',
+                text: method === 'gcash' 
+                    ? 'The client selected GCash but did not upload a screenshot.'
+                    : 'This client selected Cash-on-Meetup. No digital receipt was provided.',
+                confirmButtonColor: '#1A1A1A'
+            });
+            return;
+        }
+
         Swal.fire({
             title: 'GCash Payment Receipt',
-            text: 'Reference No: 9002 123 45678',
-            imageUrl: 'https://images.unsplash.com/photo-1620216503946-63e800d984cf?q=80&w=1964&auto=format&fit=crop',
-            imageWidth: 300,
-            imageAlt: 'Mock Receipt',
-            confirmButtonColor: '#1A1A1A'
+            html: '<p class="text-[9px] font-black uppercase tracking-[0.2em] mb-4 text-[#C16053]">Transaction Verification</p>',
+            imageUrl: receiptData,
+            imageWidth: '100%',
+            imageAlt: 'GCash Receipt',
+            confirmButtonColor: '#1A1A1A',
+            confirmButtonText: 'Verify & Close',
+            customClass: {
+                image: 'rounded-3xl border-4 border-gray-100 shadow-2xl'
+            }
         });
     };
 });
 
-// 6. Admin Gallery Actions
+// Synchronize Gallery Rendering
+window.renderGallery = () => {
+    const container = document.getElementById('admin-gallery-container');
+    if(!container) return;
+
+    let artworks = JSON.parse(localStorage.getItem('gallery_data') || '[]');
+    
+    if(artworks.length === 0) {
+        container.innerHTML = `
+            <div class="col-span-full py-32 text-center border-4 border-dashed border-gray-100/50">
+                <i data-lucide="image-off" class="w-16 h-16 text-gray-200 mx-auto mb-4"></i>
+                <p class="text-[10px] font-black uppercase text-gray-300 tracking-[0.3em]">No artworks in gallery</p>
+            </div>
+        `;
+        lucide.createIcons();
+        return;
+    }
+
+    container.innerHTML = artworks.map(art => `
+        <div class="portrait-card group w-full" data-id="${art.id}">
+            <img src="${art.img}" alt="${art.title}" onerror="this.src='${art.fallback}'">
+            
+            <!-- Admin Controls -->
+            <div class="absolute top-6 right-6 flex flex-col space-y-3 opacity-0 group-hover:opacity-100 transition-all transform translate-x-10 group-hover:translate-x-0 z-30">
+                <button onclick="editImage(this)" class="w-12 h-12 bg-white/90 backdrop-blur-md text-[#1A1A1A] flex items-center justify-center hover:bg-[#1A1A1A] hover:text-white transition-all shadow-xl">
+                    <i data-lucide="edit-3" class="w-5 h-5"></i>
+                </button>
+                <button onclick="deleteImage(this)" class="w-12 h-12 bg-white/90 backdrop-blur-md text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-xl">
+                    <i data-lucide="trash-2" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="overlay-info">
+                <p class="text-[9px] uppercase font-black tracking-widest text-[#C16053] mb-2">${art.category}</p>
+                <h4 class="text-xl font-black uppercase tracking-widest mb-4">${art.title}</h4>
+                <div class="pt-4 border-t border-white/10 flex justify-between items-center">
+                    <span class="text-[9px] font-bold uppercase tracking-widest opacity-60">Size: <span class="artwork-size">${art.size}</span></span>
+                    <i data-lucide="maximize-2" class="w-4 h-4 text-white/40 cursor-pointer" onclick="viewImage(this.closest('.portrait-card'))"></i>
+                </div>
+            </div>
+        </div>
+    `).join('');
+
+    lucide.createIcons();
+};
+
 window.deleteImage = (btn) => {
     const card = btn.closest('.portrait-card');
     const artId = card.getAttribute('data-id');
@@ -424,3 +561,308 @@ window.viewReferencePhoto = (imgData) => {
         }
     });
 }
+
+// 7. Services Management Logic
+window.previewServiceImage = (id) => {
+    const file = document.getElementById(`service-${id}-file`).files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const previewEl = document.getElementById(`service-${id}-preview`);
+            if(previewEl) previewEl.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+};
+
+window.saveServices = async () => {
+    try {
+        const getBase64 = (file) => {
+            return new Promise((resolve, reject) => {
+                if(!file) resolve(null);
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        };
+
+        Swal.fire({
+            title: 'Updating Services...',
+            text: 'Synchronizing your artistic categories...',
+            allowOutsideClick: false,
+            didOpen: () => { Swal.showLoading(); }
+        });
+
+        const currentServices = JSON.parse(localStorage.getItem('services_data')) || [];
+        const services = [];
+        
+        for(let i=1; i<=3; i++) {
+            const fileInput = document.getElementById(`service-${i}-file`);
+            const titleInput = document.getElementById(`service-${i}-title`);
+            const descInput = document.getElementById(`service-${i}-desc`);
+            
+            if(!titleInput || !descInput) continue;
+
+            const title = titleInput.value;
+            const desc = descInput.value;
+            
+            let img = currentServices.find(s => s.id === i)?.img || "";
+            
+            if(!img) {
+                const defaultMap = { 1: 'images/portrait_sample.png', 2: 'images/digital_art.png', 3: 'images/colored_art.png' };
+                img = defaultMap[i];
+            }
+
+            if(fileInput && fileInput.files[0]) {
+                const b64 = await getBase64(fileInput.files[0]);
+                if(b64) img = b64;
+            }
+            
+            services.push({ id: i, title, desc, img });
+        }
+
+        localStorage.setItem('services_data', JSON.stringify(services));
+
+        await Swal.fire({
+            icon: 'success',
+            title: 'Sync Complete!',
+            text: 'Your landing page highlights have been updated successfully.',
+            confirmButtonColor: '#1A1A1A',
+            timer: 2000,
+            timerProgressBar: true
+        });
+
+        if(typeof loadServicesToForm === 'function') loadServicesToForm();
+
+    } catch (error) {
+        console.error("Save Error:", error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Update Failed',
+            text: error.name === 'QuotaExceededError' 
+                ? 'Your images are too large for browser storage. Please try smaller files.' 
+                : 'An unexpected error occurred while saving.',
+            confirmButtonColor: '#C16053'
+        });
+    }
+};
+
+window.loadServicesToForm = () => {
+    const defaultServices = [
+        {
+            id: 1,
+            title: "Pencil Realism Art",
+            desc: '"BINI Mikha" - A breathtaking hyper-realistic pencil portrait, meticulously crafted to capture every fine detail and the most subtle micro-expressions for a truly lifelike finish.',
+            img: "images/portrait_sample.png"
+        },
+        {
+            id: 2,
+            title: "Digital Drawing Art",
+            desc: '"ASEAN Diversity & DMMMSU Legacy" - A professional digital commission. A vibrantly symbolic celebration of Southeast Asian unity, educational research, and cultural harmony.',
+            img: "images/digital_art.png"
+        },
+        {
+            id: 3,
+            title: "Colored Drawing Art",
+            desc: '"Evil Demon Slayer" - A masterful triple-panel hand-drawn illustration. Features Zenitsu, Inosuke, and Tanjiro with vibrant colored pencils, markers, and bold Japanese calligraphy.',
+            img: "images/colored_art.png"
+        }
+    ];
+
+    const services = JSON.parse(localStorage.getItem('services_data')) || defaultServices;
+
+    services.forEach(service => {
+        const titleInput = document.getElementById(`service-${service.id}-title`);
+        const descInput = document.getElementById(`service-${service.id}-desc`);
+        const previewImg = document.getElementById(`service-${service.id}-preview`);
+
+        if(titleInput) titleInput.value = service.title;
+        if(descInput) descInput.value = service.desc;
+        if(previewImg) previewImg.src = service.img;
+    });
+};
+
+// 8. Rates Management Logic
+window.saveRates = () => {
+    const rates = [];
+    for(let i=1; i<=4; i++) {
+        rates.push({
+            id: i,
+            size: document.getElementById(`rate-${i}-size`).value,
+            label: document.getElementById(`rate-${i}-label`).value,
+            price: document.getElementById(`rate-${i}-price`).value
+        });
+    }
+
+    localStorage.setItem('rates_data', JSON.stringify(rates));
+
+    Swal.fire({
+        icon: 'success',
+        title: 'Rates Updated!',
+        text: 'Pricing tiers have been updated across the platform.',
+        confirmButtonColor: '#1A1A1A'
+    });
+};
+
+window.loadRatesToForm = () => {
+    const defaultRates = [
+        { id: 1, size: '6x8', label: 'Mini Portrait', price: '300 - 400' },
+        { id: 2, size: '8.5x11', label: 'Letter Format', price: '400 - 700' },
+        { id: 3, size: 'A4', label: 'Standard Size', price: '500 - 800' },
+        { id: 4, size: '12x18', label: 'Large Scale', price: '1k - 1.5k' }
+    ];
+
+    const rates = JSON.parse(localStorage.getItem('rates_data')) || defaultRates;
+
+    rates.forEach(rate => {
+        const sizeInput = document.getElementById(`rate-${rate.id}-size`);
+        const labelInput = document.getElementById(`rate-${rate.id}-label`);
+        const priceInput = document.getElementById(`rate-${rate.id}-price`);
+
+        if(sizeInput) sizeInput.value = rate.size;
+        if(labelInput) labelInput.value = rate.label;
+        if(priceInput) priceInput.value = rate.price;
+    });
+};
+
+// 9. Change Password Logic
+window.handlePasswordUpdate = (e) => {
+    e.preventDefault();
+    const current = document.getElementById('current-pass').value;
+    const newP = document.getElementById('new-pass').value;
+    const confirmP = document.getElementById('confirm-pass').value;
+    
+    // Check against stored password or default
+    const storedPass = localStorage.getItem('admin_pass') || 'admin123';
+
+    if(current !== storedPass) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Incorrect Passkey',
+            text: 'Your current passkey does not match our records.',
+            confirmButtonColor: '#C16053'
+        });
+        return;
+    }
+
+    if(newP !== confirmP) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Mismatch',
+            text: 'New password and confirmation do not match.',
+            confirmButtonColor: '#C16053'
+        });
+        return;
+    }
+
+    if(newP.length < 6) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Security Notice',
+            text: 'Please choose a stronger password (at least 6 characters).',
+            confirmButtonColor: '#1A1A1A'
+        });
+        return;
+    }
+
+    // Save New Password
+    localStorage.setItem('admin_pass', newP);
+
+    Swal.fire({
+        icon: 'success',
+        title: 'Passkey Updated!',
+        text: 'Your administrative security credentials have been changed successfully.',
+        confirmButtonColor: '#1A1A1A'
+    }).then(() => {
+        // Clear inputs for security
+        document.getElementById('current-pass').value = '';
+        document.getElementById('new-pass').value = '';
+        document.getElementById('confirm-pass').value = '';
+    });
+};
+
+// 10. Intelligent Duplicate Cleanup
+window.cleanDuplicates = () => {
+    let bookings = JSON.parse(localStorage.getItem('bookings') || '[]');
+    let initialCount = bookings.length;
+
+    if(initialCount === 0) {
+        Swal.fire({
+            icon: 'info',
+            title: 'Empty Records',
+            text: 'There are no commissions to check for duplicates.',
+            confirmButtonColor: '#1A1A1A'
+        });
+        return;
+    }
+
+    // Filter logic: Unique by name, email, and medium
+    const seen = new Set();
+    const uniqueBookings = bookings.filter(book => {
+        const key = `${book.name.toLowerCase()}-${book.email.toLowerCase()}-${book.medium.toLowerCase()}`;
+        if(seen.has(key)) {
+            return false;
+        }
+        seen.add(key);
+        return true;
+    });
+
+    const duplicateCount = initialCount - uniqueBookings.length;
+
+    if(duplicateCount === 0) {
+        Swal.fire({
+            icon: 'success',
+            title: 'Data is Clean',
+            text: 'No duplicate booking records were found.',
+            confirmButtonColor: '#1A1A1A'
+        });
+        return;
+    }
+
+    Swal.fire({
+        title: `Remove ${duplicateCount} Duplicates?`,
+        text: `We found ${duplicateCount} redundant entries with matching credentials. Would you like to purge them?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#C16053',
+        cancelButtonColor: '#1A1A1A',
+        confirmButtonText: 'Yes, Purge'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            localStorage.setItem('bookings', JSON.stringify(uniqueBookings));
+            renderAdminRequests();
+            if(typeof initStatsCharts === 'function') initStatsCharts(); // Update Charts
+            
+            Swal.fire({
+                icon: 'success',
+                title: 'Data Optimized',
+                text: `${duplicateCount} duplicate entries have been successfully removed.`,
+                confirmButtonColor: '#1A1A1A'
+            });
+        }
+    });
+};
+
+// 11. Administrative Logout
+window.logout = () => {
+    Swal.fire({
+        title: 'Sign Out?',
+        text: 'You will need to re-authenticate to manage your commissions.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#C16053',
+        cancelButtonColor: '#1A1A1A',
+        confirmButtonText: 'Yes, Sign Out'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // Clear Authentication State
+            localStorage.removeItem('user_role');
+            localStorage.removeItem('user_name');
+            localStorage.removeItem('user_email');
+            
+            // Graceful Redirect
+            window.location.href = 'index.html';
+        }
+    });
+};

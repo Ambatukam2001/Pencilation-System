@@ -7,11 +7,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if(loginForm) {
         loginForm.addEventListener('submit', (e) => {
             e.preventDefault();
-            const email = document.getElementById('login-email').value;
+            const username = document.getElementById('login-username').value;
             const password = document.getElementById('login-password').value;
 
             // Form Validation (Simple)
-            if(email && password) {
+            if(username && password) {
                 Swal.fire({
                     title: 'Verifying Credentials...',
                     html: 'Connecting to secure server',
@@ -23,7 +23,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Simulate Network Delay
                 setTimeout(() => {
-                    if(email === 'admin@drawd.com' && password === 'admin123') { // Admin Simulator
+                    const storedPass = localStorage.getItem('admin_pass') || 'admin123';
+                    
+                    if(username.toLowerCase() === 'admin' && password === storedPass) { 
                         localStorage.setItem('user_name', 'ADEL');
                         localStorage.setItem('user_role', 'admin');
                         

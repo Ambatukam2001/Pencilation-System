@@ -25,18 +25,50 @@ h1, h2, h3, .font-display {
     border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
+.line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    line-clamp: 3;
+    overflow: hidden;
+}
+
 .gallery-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    display: flex;
+    overflow-x: auto;
     gap: 1.5rem;
+    padding-bottom: 2rem;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+}
+
+.gallery-grid-wrapped {
+    display: grid !important;
+    overflow-x: hidden !important;
+    padding-bottom: 0;
+}
+
+.gallery-grid-wrapped .portrait-card {
+    width: 100% !important;
+    margin-bottom: 0;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
 }
 
 .portrait-card {
     position: relative;
     overflow: hidden;
-    aspect-ratio: 4/5;
+    height: 480px; 
+    width: 320px;
     background: var(--accent-gray);
     transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    flex-shrink: 0;
 }
 
 .portrait-card:hover {
@@ -141,4 +173,14 @@ h1, h2, h3, .font-display {
 
 .animate-fade-in-up {
     animation: fadeInUp 0.8s ease-out forwards;
+}
+
+/* Custom Overrides */
+.text-xl {
+    font-size: 9px !important;
+    color: #22c55e !important; /* Tailwind green-500 equivalent */
+}
+
+.text-8xl {
+    color: rgb(188 94 81) !important;
 }
