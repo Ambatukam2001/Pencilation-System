@@ -78,6 +78,19 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         if(meetupName) meetupName.textContent = locMap[meetupLoc] || meetupLoc;
     }
+
+    // Live Session Status Check
+    const liveBadge = document.getElementById('artist-live-badge');
+    const liveLink = document.getElementById('live-session-link');
+    const isArtistLive = localStorage.getItem('is_live_session') === 'true';
+    const artistLiveUrl = localStorage.getItem('live_meeting_url');
+
+    if(liveBadge && isArtistLive) {
+        liveBadge.classList.replace('hidden', 'flex');
+        if(liveLink && artistLiveUrl) {
+            liveLink.href = artistLiveUrl;
+        }
+    }
 });
 
 // Logout Utility

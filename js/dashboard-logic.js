@@ -21,9 +21,23 @@ document.addEventListener('DOMContentLoaded', () => {
         if(adminControls) adminControls.classList.remove('hidden');
         renderAdminRequests();
     } else {
-        if(dashboardName) dashboardName.textContent = storedName || "Guest User";
+        if(headerTitle) headerTitle.textContent = storedName || "Guest User";
         if(dashboardRole) dashboardRole.textContent = "Client Profile";
         renderUserOverview();
+    }
+
+    // Initialize Live Session Control
+    if(isAdmin) {
+        const liveBtn = document.getElementById('live-session-btn');
+        if(liveBtn) {
+            const isLive = localStorage.getItem('is_live_session') === 'true';
+            if(isLive) {
+                liveBtn.classList.replace('bg-yellow-50', 'bg-red-500');
+                liveBtn.classList.replace('text-yellow-600', 'text-white');
+                liveBtn.querySelector('span').textContent = 'Live Now';
+                liveBtn.querySelector('i').classList.add('animate-pulse');
+            }
+        }
     }
 
     // 1. Render Admin Requests from LocalStorage
@@ -844,7 +858,84 @@ window.cleanDuplicates = () => {
     });
 };
 
-// 11. Administrative Logout
+// 12. Smart Live Session Control
+window.toggleLiveSession = () => {
+    const isLive = localStorage.getItem('is_live_session') === 'true';
+    const liveBtn = document.getElementById('live-session-btn');
+    
+    if(!isLive) {
+        Swal.fire({
+            title: 'Launch Live Session?',
+            html: `
+                <div class="space-y-4 text-left p-4">
+                    <p class="text-xs font-black uppercase text-gray-400">Meeting URL (Optional)</p>
+                    <input type="url" id="live-url" class="swal2-input !m-0 w-full" placeholder="https://meet.google.com/..." value="${localStorage.getItem('live_meeting_url') || ''}">
+                     <p class="text-[10px] opacity-40 italic mt-2">This link will be visible to clients while you are live.</p>
+                </div>
+            `,
+            icon: 'info',
+            showCancelButton: true,
+            confirmButtonColor: '#C16053',
+            confirmButtonText: 'Go Live Now',
+            preConfirm: () => {
+                return document.getElementById('live-url').value;
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                localStorage.setItem('is_live_session', 'true');
+                localStorage.setItem('live_meeting_url', result.value || '');
+                
+                // Update Button
+                if(liveBtn) {
+                    liveBtn.classList.replace('bg-yellow-50', 'bg-red-500');
+                    liveBtn.classList.replace('text-yellow-600', 'text-white');
+                    liveBtn.querySelector('span').textContent = 'Live Now';
+                    const icon = liveBtn.querySelector('i');
+                    if(icon) icon.classList.add('animate-pulse');
+                }
+
+                Swal.fire({
+                    icon: 'success',
+                    title: 'System is Live!',
+                    text: 'Your current status is now broadcasted to all visitors.',
+                    timer: 1500,
+                    showConfirmButton: false
+                });
+            }
+        });
+    } else {
+        Swal.fire({
+            title: 'End Live Session?',
+            text: 'This will hide your live status and meeting link from the public pool.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#1A1A1A',
+            confirmButtonText: 'End Session'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                localStorage.setItem('is_live_session', 'false');
+                
+                // Update Button
+                if(liveBtn) {
+                    liveBtn.classList.replace('bg-red-500', 'bg-yellow-50');
+                    liveBtn.classList.replace('text-white', 'text-yellow-600');
+                    liveBtn.querySelector('span').textContent = 'Live Session';
+                    const icon = liveBtn.querySelector('i');
+                    if(icon) icon.classList.remove('animate-pulse');
+                }
+
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Session Archived',
+                    timer: 1500,
+                    showConfirmButton: false
+                });
+            }
+        });
+    }
+};
+
+// Administrative Logout
 window.logout = () => {
     Swal.fire({
         title: 'Sign Out?',
