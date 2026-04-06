@@ -37,107 +37,113 @@ const DEFAULT_RATES = [
 ];
 
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Render Gallery Logic
-    window.renderGallery = () => {
+    // 1. Fetch & Render Gallery Logic
+    window.renderGallery = async () => {
         const galleryContainer = document.getElementById('gallery-container');
         const adminGalleryGrid = document.querySelector('#gallery-tab .gallery-grid');
-        const artworks = JSON.parse(localStorage.getItem('gallery_data')) || DEFAULT_ARTWORKS;
         
-        if(!localStorage.getItem('gallery_data')) {
-            localStorage.setItem('gallery_data', JSON.stringify(DEFAULT_ARTWORKS));
-        }
+        try {
+            const response = await fetch(`${CONFIG.API_URL}/artworks`);
+            const artworks = response.ok ? await response.json() : DEFAULT_ARTWORKS;
+            const data = (artworks && artworks.length > 0) ? artworks : DEFAULT_ARTWORKS;
 
-        if(galleryContainer) {
-            galleryContainer.innerHTML = artworks.map(art => `
-                <div class="portrait-card" onclick="viewImage(this)">
-                    <img src="${art.img}" alt="${art.title}" onerror="this.src='${art.fallback}'">
-                    <div class="overlay-info">
-                        <p class="text-[10px] uppercase tracking-widest mb-1 italic opacity-60">${art.category}</p>
-                        <h4 class="text-xl font-bold uppercase tracking-widest mb-2">${art.title}</h4>
-                        <div class="flex items-center justify-between border-t border-white/20 pt-3 mt-1">
-                            <span class="text-[10px] font-black uppercase tracking-widest">Size: <span class="artwork-size">${art.size}</span></span>
+            if(galleryContainer) {
+                galleryContainer.innerHTML = data.map(art => `
+                    <div class="portrait-card" onclick="viewImage(this)">
+                        <img src="${art.image_url || art.img}" alt="${art.title}" onerror="this.src='${art.fallback || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2'}'">
+                        <div class="overlay-info">
+                            <p class="text-[10px] uppercase tracking-widest mb-1 italic opacity-60">${art.category}</p>
+                            <h4 class="text-xl font-bold uppercase tracking-widest mb-2">${art.title}</h4>
+                            <div class="flex items-center justify-between border-t border-white/20 pt-3 mt-1">
+                                <span class="text-[10px] font-black uppercase tracking-widest">Size: <span class="artwork-size">${art.size}</span></span>
+                            </div>
                         </div>
                     </div>
-                </div>
-            `).join('');
-        }
+                `).join('');
+            }
 
-        if(adminGalleryGrid) {
-            adminGalleryGrid.innerHTML = artworks.map(art => `
-                <div class="portrait-card rounded-[2rem] overflow-hidden group border-8 border-white shadow-xl relative" data-id="${art.id}">
-                    <img src="${art.img}" onerror="this.src='${art.fallback}'" class="group-hover:scale-110 transition-transform duration-700">
-                    <div class="overlay-info p-8 bg-gradient-to-t from-black/90 via-black/40 to-transparent">
-                         <p class="text-[10px] uppercase font-black text-[#C16053] tracking-widest">${art.category}</p>
-                         <h4 class="text-xl font-bold text-white uppercase tracking-widest mb-2">${art.title}</h4>
-                         <div class="flex items-center justify-between border-t border-white/20 pt-3 mt-1">
-                             <span class="text-[9px] font-black uppercase text-white tracking-widest">Size: <span class="artwork-size">${art.size}</span></span>
-                         </div>
-                    </div>
-                    <div class="absolute top-6 right-6 flex flex-col space-y-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onclick="editImage(this)" class="w-10 h-10 bg-white text-[#1A1A1A] rounded-full flex items-center justify-center hover:bg-[#C16053] hover:text-white transition-all shadow-lg">
-                            <i data-lucide="edit-3" class="w-4 h-4"></i>
-                        </button>
-                        <button onclick="deleteImage(this)" class="w-10 h-10 bg-white text-red-500 rounded-full flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-lg">
-                            <i data-lucide="trash-2" class="w-4 h-4"></i>
-                        </button>
-                    </div>
-                </div>
-            `).join('');
-            lucide.createIcons();
+        } catch (error) {
+            console.error("Gallery Sync Error:", error);
         }
     };
 
     // 2. Render Services Logic
-    window.renderServices = () => {
+    window.renderServices = async () => {
         const servicesGrid = document.getElementById('services-grid-container');
-        if(!servicesGrid) return;
-        const services = JSON.parse(localStorage.getItem('services_data')) || DEFAULT_SERVICES;
+        const bookingMedium = document.getElementById('booking-medium');
+        
+        try {
+            const response = await fetch(`${CONFIG.API_URL}/services`);
+            const services = response.ok ? await response.json() : DEFAULT_SERVICES;
+            const data = (services && services.length > 0) ? services : DEFAULT_SERVICES;
 
-        servicesGrid.innerHTML = services.map(service => `
-            <div class="group border-b border-gray-100 pb-12">
-                <div class="aspect-square bg-[#FDFBF7] overflow-hidden mb-8 relative">
-                    <img src="${service.img}" alt="${service.title}"
-                        class="w-full h-full object-cover opacity-80 group-hover:scale-110 transition-all duration-700">
-                </div>
-                <h3 class="text-lg font-black uppercase tracking-[0.2em] mb-4 text-[#1A1A1A] font-sans pt-4">${service.title}</h3>
-                <p class="opacity-60 text-[11px] leading-relaxed line-clamp-3">${service.desc}</p>
-            </div>
-        `).join('');
+            if(servicesGrid) {
+                servicesGrid.innerHTML = data.map(service => `
+                    <div class="group border-b border-gray-100 pb-12">
+                        <div class="aspect-square bg-[#FDFBF7] overflow-hidden mb-8 relative">
+                            <img src="${service.image_url || service.img}" alt="${service.title}"
+                                class="w-full h-full object-cover opacity-80 group-hover:scale-110 transition-all duration-700">
+                        </div>
+                        <h3 class="text-lg font-black uppercase tracking-[0.2em] mb-4 text-[#1A1A1A] font-sans pt-4">${service.title}</h3>
+                        <p class="opacity-60 text-[11px] leading-relaxed line-clamp-3">${service.description || service.desc}</p>
+                    </div>
+                `).join('');
+            }
+            
+            if(bookingMedium) {
+                bookingMedium.innerHTML = data.map(service => `<option value="${service.title}">${service.title}</option>`).join('');
+            }
+        } catch (error) {
+            console.error("Services Sync Error:", error);
+        }
     };
 
     // 3. Render Rates Logic
-    window.renderRates = () => {
-        const ratesGrid = document.querySelector('#rates .md\\:w-2\\/3');
-        if(!ratesGrid) return;
-        const rates = JSON.parse(localStorage.getItem('rates_data')) || DEFAULT_RATES;
+    window.renderRates = async () => {
+        const ratesContainer = document.querySelector('#rates .md\\:w-2\\/3');
+        const bookingSize = document.getElementById('booking-size');
 
-        ratesGrid.innerHTML = rates.map(rate => {
-            const isPopular = rate.popular || rate.size === '8.5x11';
-            return isPopular ? `
-                <div class="p-8 bg-[#1A1A1A] text-white rounded-[3rem] shadow-2xl relative group flex flex-col justify-between h-full">
-                    <div class="absolute -top-4 -right-4 bg-[#C16053] text-[9px] font-black uppercase px-6 py-2 rounded-full tracking-widest shadow-xl">Standard</div>
-                    <div>
-                        <p class="text-[10px] font-black uppercase tracking-widest text-[#C16053] mb-6 tracking-[0.2em]">${rate.label}</p>
-                        <h4 class="text-4xl font-black mb-2 uppercase">${rate.size}</h4>
-                        <p class="text-[9px] font-black uppercase opacity-30 tracking-[0.3em] mb-12 italic">Most Popular Choice</p>
-                    </div>
-                    <div class="text-xl font-black tracking-widest">
-                        <span class="text-sm opacity-30">₱</span>${rate.price}
-                    </div>
-                </div>
-            ` : `
-                <div class="p-8 border-2 border-gray-100 rounded-[3rem] hover:border-[#1A1A1A] transition-all group flex flex-col justify-between h-full bg-white">
-                    <div>
-                        <p class="text-[10px] font-black uppercase tracking-widest text-gray-300 mb-6 tracking-[0.2em]">${rate.label}</p>
-                        <h4 class="text-4xl font-black mb-2 uppercase">${rate.size}</h4>
-                        <p class="text-[9px] font-black uppercase text-[#C16053] tracking-[0.3em] mb-12 italic">Premium Quality</p>
-                    </div>
-                    <div class="text-xl font-black tracking-widest">
-                        <span class="text-sm opacity-30">₱</span>${rate.price}
-                    </div>
-                </div>
-            `;
-        }).join('');
+        try {
+            const response = await fetch(`${CONFIG.API_URL}/rates`);
+            const rates = response.ok ? await response.json() : DEFAULT_RATES;
+            const data = (rates && rates.length > 0) ? rates : DEFAULT_RATES;
+
+            if(ratesContainer) {
+                ratesContainer.innerHTML = data.map(rate => {
+                    const isPopular = rate.popular || rate.size === '8.5x11' || rate.size === '9 x 12';
+                    return isPopular ? `
+                        <div class="p-8 bg-[#1A1A1A] text-white rounded-[3rem] shadow-2xl relative group flex flex-col justify-between h-full">
+                            <div class="absolute -top-4 -right-4 bg-[#C16053] text-[9px] font-black uppercase px-6 py-2 rounded-full tracking-widest shadow-xl">Standard</div>
+                            <div>
+                                <p class="text-[10px] font-black uppercase tracking-widest text-[#C16053] mb-6 tracking-[0.2em]">${rate.label}</p>
+                                <h4 class="text-4xl font-black mb-2 uppercase">${rate.size}</h4>
+                                <p class="text-[9px] font-black uppercase opacity-30 tracking-[0.3em] mb-12 italic">Most Popular Choice</p>
+                            </div>
+                            <div class="text-xl font-black tracking-widest">
+                                <span class="text-sm opacity-30">₱</span>${rate.price}
+                            </div>
+                        </div>
+                    ` : `
+                        <div class="p-8 border-2 border-gray-100 rounded-[3rem] hover:border-[#1A1A1A] transition-all group flex flex-col justify-between h-full bg-white">
+                            <div>
+                                <p class="text-[10px] font-black uppercase tracking-widest text-gray-300 mb-6 tracking-[0.2em]">${rate.label}</p>
+                                <h4 class="text-4xl font-black mb-2 uppercase">${rate.size}</h4>
+                                <p class="text-[9px] font-black uppercase text-[#C16053] tracking-[0.3em] mb-12 italic">Premium Quality</p>
+                            </div>
+                            <div class="text-xl font-black tracking-widest">
+                                <span class="text-sm opacity-30">₱</span>${rate.price}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+            
+            if(bookingSize) {
+                bookingSize.innerHTML = data.map(rate => `<option value="${rate.size}">${rate.size} (₱${rate.price})</option>`).join('');
+            }
+        } catch (error) {
+            console.error("Rates Sync Error:", error);
+        }
     };
 
     // 4. Gallery Utilities

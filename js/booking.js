@@ -38,7 +38,33 @@ document.addEventListener('DOMContentLoaded', () => {
                 return new Promise((resolve, reject) => {
                     if(!file) resolve(null);
                     const reader = new FileReader();
-                    reader.onload = () => resolve(reader.result);
+                    reader.onload = (event) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            const MAX_WIDTH = 800;
+                            const MAX_HEIGHT = 800;
+                            let width = img.width;
+                            let height = img.height;
+
+                            if (width > height && width > MAX_WIDTH) {
+                                height *= MAX_WIDTH / width;
+                                width = MAX_WIDTH;
+                            } else if (height > MAX_HEIGHT) {
+                                width *= MAX_HEIGHT / height;
+                                height = MAX_HEIGHT;
+                            }
+
+                            canvas.width = width;
+                            canvas.height = height;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0, width, height);
+                            // Compress heavily to avoid 413/500 errors
+                            resolve(canvas.toDataURL('image/jpeg', 0.5));
+                        };
+                        img.onerror = reject;
+                        img.src = event.target.result;
+                    };
                     reader.onerror = reject;
                     reader.readAsDataURL(file);
                 });
@@ -54,35 +80,51 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const bookingData = {
-                id: Date.now(),
-                name: formData.get('name'),
-                email: formData.get('email'),
-                phone: formData.get('phone'),
-                social: formData.get('social'),
+                client_name: formData.get('name'),
+                client_email: formData.get('email'),
+                client_phone: formData.get('phone'),
+                client_social: formData.get('social'),
                 medium: formData.get('medium'),
                 size: formData.get('size'),
                 address: formData.get('address'),
                 deadline: formData.get('deadline'),
-                payment: paymentType,
-                reference: referenceImg,
-                payment_receipt: receiptImg, // New Field
-                status: 'pending',
-                date: new Date().toLocaleDateString()
+                payment_method: paymentType,
+                reference_url: referenceImg,
+                receipt_url: receiptImg
             };
 
-            let bookings = JSON.parse(localStorage.getItem('bookings') || '[]');
-            bookings.push(bookingData);
-            localStorage.setItem('bookings', JSON.stringify(bookings));
+            try {
+                const response = await fetch(`${CONFIG.API_URL}/bookings`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(bookingData)
+                });
 
-            Swal.fire({
-                icon: 'success',
-                title: 'Commission Request Sent!',
-                text: `Request sent. Artist will contact you at ${bookingData.email} after verifying the payment.`,
-                confirmButtonColor: '#C16053'
-            }).then(() => {
-                bookingForm.reset();
-                if(typeof toggleGCashReceipt === 'function') toggleGCashReceipt(bookingForm.querySelector('select[name="payment"]'));
-            });
+                if (!response.ok) throw new Error(`Server status ${response.status}: ${response.statusText}`);
+
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Commission Request Sent!',
+                    text: `Request successfully submitted to our cloud system. Artist will contact you at ${bookingData.client_email} soon!`,
+                    confirmButtonColor: '#C16053'
+                }).then(() => {
+                    bookingForm.reset();
+                    if(typeof toggleGCashReceipt === 'function') toggleGCashReceipt(bookingForm.querySelector('select[name="payment"]'));
+                });
+            } catch (error) {
+                console.error("Submission Error Details:", error);
+                const errorMsg = error.message.includes('413') ? 'Image is too large for the server.' : 
+                               (error.message.includes('500') ? 'Internal Server Error (Check Supabase).' : 
+                               'Could not connect to the cloud server or request timed out.');
+
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Submission Failed',
+                    text: `${errorMsg} Please try a smaller image or check your connection.`,
+                    footer: `<small class="opacity-50">Log: ${error.message}</small>`,
+                    confirmButtonColor: '#1A1A1A'
+                });
+            }
         });
     }
 

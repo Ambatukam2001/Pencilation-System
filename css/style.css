@@ -184,3 +184,82 @@ h1, h2, h3, .font-display {
 .text-8xl {
     color: rgb(188 94 81) !important;
 }
+
+/* --- High-Fidelity Navigation Dock Styles --- */
+.glass-dock {
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(25px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    padding: 8px;
+    border-radius: 20px;
+    gap: 8px;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.08);
+}
+
+.dock-item {
+    position: relative;
+    padding: 14px;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    color: #1A1A1A;
+    text-decoration: none;
+    background: transparent;
+    min-width: 52px;
+}
+
+.dock-item i {
+    width: 22px;
+    height: 22px;
+    transition: transform 0.3s ease;
+}
+
+.dock-item .dock-label {
+    position: absolute;
+    bottom: -35px;
+    left: 50%;
+    transform: translateX(-50%) translateY(5px);
+    font-size: 9px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    background: #1A1A1A;
+    color: white;
+    padding: 5px 10px;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+    border-radius: 6px !important;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    z-index: 1100;
+}
+
+.dock-item:hover {
+    transform: scale(1.15) translateY(-8px);
+    background: white;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    z-index: 10;
+}
+
+.dock-item:hover i {
+    transform: translateY(0);
+}
+
+.dock-item:hover .dock-label {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+}
+
+.active-dock-item {
+    background: white !important;
+    color: #C16053 !important;
+    box-shadow: 0 8px 20px rgba(193, 96, 83, 0.15);
+}
+
