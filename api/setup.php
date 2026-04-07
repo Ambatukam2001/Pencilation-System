@@ -58,6 +58,13 @@ try {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )");
 
+    // Secure Admin Users Table (For login & password updates)
+    $db->exec("CREATE TABLE IF NOT EXISTS admin_users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        username VARCHAR(255) UNIQUE NOT NULL,
+        password_hash VARCHAR(255) NOT NULL
+    )");
+
     // Seed Data if empty
     $serviceCount = $db->query("SELECT COUNT(*) FROM services")->fetchColumn();
     if ($serviceCount == 0) {
@@ -83,6 +90,12 @@ try {
         $db->exec("INSERT INTO artworks (title, category, size, image_url, is_featured) VALUES 
             ('Graceful Glance', 'Graphite', '9x12 inches', 'images/portrait_sample.png', 1)
         ");
+    }
+
+    $adminCount = $db->query("SELECT COUNT(*) FROM admin_users")->fetchColumn();
+    if ($adminCount == 0) {
+        $defaultHash = password_hash('admin123', PASSWORD_DEFAULT);
+        $db->exec("INSERT INTO admin_users (username, password_hash) VALUES ('adel', '$defaultHash')");
     }
 
     echo "Database setup completed successfully.";
