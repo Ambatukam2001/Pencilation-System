@@ -668,92 +668,107 @@ window.saveServices = async () => {
     }
 };
 
-window.loadServicesToForm = () => {
+// ── Load Services into Form (from DB) ─────────────────────────
+window.loadServicesToForm = async () => {
     const defaultServices = [
-        {
-            id: 1,
-            title: "Pencil Realism Art",
-            desc: '"BINI Mikha" - A breathtaking hyper-realistic pencil portrait, meticulously crafted to capture every fine detail and the most subtle micro-expressions for a truly lifelike finish.',
-            img: "images/portrait_sample.png"
-        },
-        {
-            id: 2,
-            title: "Digital Drawing Art",
-            desc: '"ASEAN Diversity & DMMMSU Legacy" - A professional digital commission. A vibrantly symbolic celebration of Southeast Asian unity, educational research, and cultural harmony.',
-            img: "images/digital_art.png"
-        },
-        {
-            id: 3,
-            title: "Colored Drawing Art",
-            desc: '"Evil Demon Slayer" - A masterful triple-panel hand-drawn illustration. Features Zenitsu, Inosuke, and Tanjiro with vibrant colored pencils, markers, and bold Japanese calligraphy.',
-            img: "images/colored.jpg"
-        }
+        { id: 1, title: 'Pencil Realism Art',  description: '"BINI Mikha" - Hyper-realistic pencil portrait capturing every fine detail.',            image_url: 'images/portrait_sample.png' },
+        { id: 2, title: 'Digital Drawing Art', description: '"ASEAN Diversity" - Vibrant digital commission celebrating Southeast Asian unity.', image_url: 'images/digital_art.png'     },
+        { id: 3, title: 'Colored Drawing Art', description: '"Evil Demon Slayer" - Triple-panel illustration with colored pencils and markers.',     image_url: 'images/colored.jpg'         }
     ];
 
-    const services = JSON.parse(localStorage.getItem('services_data')) || defaultServices;
-
-    services.forEach(service => {
-        const titleInput = document.getElementById(`service-${service.id}-title`);
-        const descInput = document.getElementById(`service-${service.id}-desc`);
-        const previewImg = document.getElementById(`service-${service.id}-preview`);
-
-        if(titleInput) titleInput.value = service.title;
-        if(descInput) descInput.value = service.desc;
-        if(previewImg) previewImg.src = service.img;
-    });
-};
-
-// 8. Rates Management Logic
-window.saveRates = async () => {
-    Swal.fire({
-        title: 'Updating Rates...',
-        text: 'Synchronizing pricing structures with the cloud...',
-        allowOutsideClick: false,
-        didOpen: () => { Swal.showLoading(); }
-    });
-
     try {
-        for(let i=1; i<=4; i++) {
-            const data = {
-                size: document.getElementById(`rate-${i}-size`).value,
-                label: document.getElementById(`rate-${i}-label`).value,
-                price: document.getElementById(`rate-${i}-price`).value
-            };
-            
-            await fetch(`${CONFIG.API_URL}/admin/rates/${i}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
-        }
+        const res = await fetch(`${CONFIG.API_URL}/admin/services`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const services = await res.json();
+        const data = services.length ? services : defaultServices;
 
-        Swal.fire({
-            icon: 'success',
-            title: 'Rates Updated!',
-            text: 'Pricing tiers have been updated securely.',
-            confirmButtonColor: '#1A1A1A'
+        data.forEach((service, index) => {
+            const i         = index + 1;
+            const titleEl   = document.getElementById(`service-${i}-title`);
+            const descEl    = document.getElementById(`service-${i}-desc`);
+            const previewEl = document.getElementById(`service-${i}-preview`);
+
+            if (titleEl)   { titleEl.value        = service.title || '';       titleEl.dataset.dbId = service.id; }
+            if (descEl)    { descEl.value         = service.description || ''; }
+            if (previewEl) { previewEl.src         = service.image_url || 'images/portrait_sample.png'; previewEl.dataset.src = service.image_url || ''; }
         });
-    } catch(err) {
-        Swal.fire({ icon: 'error', title: 'Update Failed', confirmButtonColor: '#C16053' });
+    } catch (err) {
+        console.error('Load Services Error:', err);
+        // Fall back to defaults silently
+        defaultServices.forEach((s, index) => {
+            const i = index + 1;
+            const t = document.getElementById(`service-${i}-title`);
+            const d = document.getElementById(`service-${i}-desc`);
+            const p = document.getElementById(`service-${i}-preview`);
+            if (t) { t.value = s.title;       t.dataset.dbId = s.id; }
+            if (d)   d.value = s.description;
+            if (p) { p.src   = s.image_url;   p.dataset.src  = s.image_url; }
+        });
     }
 };
 
+// ── Preview service image (local file picker) ──────────────────
+window.previewServiceImage = (i) => {
+    const file = document.getElementById(`service-${i}-file`)?.files[0];
+    if (!file) return;
+    const reader    = new FileReader();
+    reader.onload   = (e) => {
+        const preview = document.getElementById(`service-${i}-preview`);
+        if (preview) preview.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+};
+
+// ── Load Rates to Form (from DB) ─────────────────────────────
 window.loadRatesToForm = async () => {
     try {
-        const response = await fetch(`${CONFIG.API_URL}/rates`);
-        const rates = response.ok ? await response.json() : [];
+        const res   = await fetch(`${CONFIG.API_URL}/admin/rates`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const rates = await res.json();
 
-        rates.forEach(rate => {
-            const sizeInput = document.getElementById(`rate-${rate.id}-size`);
-            const labelInput = document.getElementById(`rate-${rate.id}-label`);
-            const priceInput = document.getElementById(`rate-${rate.id}-price`);
+        rates.forEach((rate, index) => {
+            const i       = index + 1;
+            const sizeEl  = document.getElementById(`rate-${i}-size`);
+            const labelEl = document.getElementById(`rate-${i}-label`);
+            const priceEl = document.getElementById(`rate-${i}-price`);
 
-            if(sizeInput) sizeInput.value = rate.size;
-            if(labelInput) labelInput.value = rate.label;
-            if(priceInput) priceInput.value = rate.price;
+            if (sizeEl)  { sizeEl.value  = rate.size  || ''; sizeEl.dataset.dbId = rate.id; }
+            if (labelEl)   labelEl.value = rate.label || '';
+            if (priceEl)   priceEl.value = rate.price || '';
         });
-    } catch(err) {
-        console.error("Error loading rates:", err);
+    } catch (err) {
+        console.error('Load Rates Error:', err);
+    }
+};
+
+// ── Save Rates to DB via API ────────────────────────────────
+window.saveRates = async () => {
+    Swal.fire({ title: 'Saving Rates…', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    try {
+        const errors = [];
+        for (let i = 1; i <= 4; i++) {
+            const sizeEl  = document.getElementById(`rate-${i}-size`);
+            if (!sizeEl) continue;
+            const id    = sizeEl.dataset.dbId || i;
+            const size  = sizeEl.value.trim();
+            const label = document.getElementById(`rate-${i}-label`)?.value.trim() || '';
+            const price = document.getElementById(`rate-${i}-price`)?.value.trim() || '0';
+
+            const res = await fetch(`${CONFIG.API_URL}/admin/rates/${id}`, {
+                method:  'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ size, label, price })
+            });
+            if (!res.ok) errors.push(`Rate ${i}: HTTP ${res.status}`);
+        }
+
+        if (errors.length) {
+            Swal.fire({ icon: 'warning', title: 'Partial Save', html: errors.join('<br>'), confirmButtonColor: '#C16053' });
+        } else {
+            Swal.fire({ icon: 'success', title: 'Rates Updated!', confirmButtonColor: '#1A1A1A', timer: 2000, timerProgressBar: true });
+        }
+    } catch (err) {
+        Swal.fire({ icon: 'error', title: 'Save Failed', text: err.message, confirmButtonColor: '#C16053' });
     }
 };
 
@@ -1143,99 +1158,4 @@ document.addEventListener('DOMContentLoaded', () => {
         switchTab('booking-tab');
     }
 });
-
-// SERVICE MANAGER LOGIC
-window.loadServicesToForm = async () => {
-    try {
-        const response = await fetch(`${CONFIG.API_URL}/admin/services`);
-        const services = await response.json();
-        
-        services.forEach((service, index) => {
-            const i = index + 1;
-            const titleInput = document.getElementById(`service-${i}-title`);
-            const descInput = document.getElementById(`service-${i}-desc`);
-            const previewImg = document.getElementById(`service-${i}-preview`);
-            
-            if(titleInput) titleInput.value = service.title;
-            if(descInput) descInput.value = service.description;
-            if(previewImg) previewImg.src = service.image_url || 'images/portrait_sample.png';
-            
-            // Store database ID on the element
-            if(titleInput) titleInput.dataset.dbId = service.id;
-        });
-    } catch (e) { console.error("Load Services Error:", e); }
-};
-
-window.saveServices = async () => {
-    Swal.fire({ title: 'Saving Services...', didOpen: () => Swal.showLoading() });
-    try {
-        for(let i=1; i<=3; i++) {
-            const id = document.getElementById(`service-${i}-title`).dataset.dbId;
-            const title = document.getElementById(`service-${i}-title`).value;
-            const description = document.getElementById(`service-${i}-desc`).value;
-            const image_url = document.getElementById(`service-${i}-preview`).src;
-
-            await fetch(`${CONFIG.API_URL}/admin/services/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title, description, image_url })
-            });
-        }
-        Swal.fire({ icon: 'success', title: 'Services Updated', confirmButtonColor: '#1A1A1A' });
-    } catch (e) {
-        Swal.fire({ icon: 'error', title: 'Update Failed', confirmButtonColor: '#1A1A1A' });
-    }
-};
-
-window.previewServiceImage = async (index) => {
-    const file = document.getElementById(`service-${index}-file`).files[0];
-    if(!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        document.getElementById(`service-${index}-preview`).src = e.target.result;
-    };
-    reader.readAsDataURL(file);
-};
-
-// RATE MANAGER LOGIC
-window.loadRatesToForm = async () => {
-    try {
-        const response = await fetch(`${CONFIG.API_URL}/admin/rates`);
-        const rates = await response.json();
-        
-        rates.forEach((rate, index) => {
-            const i = index + 1;
-            const sizeInput = document.getElementById(`rate-${i}-size`);
-            const labelInput = document.getElementById(`rate-${i}-label`);
-            const priceInput = document.getElementById(`rate-${i}-price`);
-            
-            if(sizeInput) sizeInput.value = rate.size;
-            if(labelInput) labelInput.value = rate.label;
-            if(priceInput) priceInput.value = rate.price;
-            
-            if(sizeInput) sizeInput.dataset.dbId = rate.id;
-        });
-    } catch (e) { console.error("Load Rates Error:", e); }
-};
-
-window.saveRates = async () => {
-    Swal.fire({ title: 'Saving Rates...', didOpen: () => Swal.showLoading() });
-    try {
-        for(let i=1; i<=4; i++) {
-            const id = document.getElementById(`rate-${i}-size`).dataset.dbId;
-            const size = document.getElementById(`rate-${i}-size`).value;
-            const label = document.getElementById(`rate-${i}-label`).value;
-            const price = document.getElementById(`rate-${i}-price`).value;
-
-            await fetch(`${CONFIG.API_URL}/admin/rates/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ size, label, price })
-            });
-        }
-        Swal.fire({ icon: 'success', title: 'Rates Updated', confirmButtonColor: '#1A1A1A' });
-    } catch (e) {
-        Swal.fire({ icon: 'error', title: 'Update Failed', confirmButtonColor: '#1A1A1A' });
-    }
-};
 
