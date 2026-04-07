@@ -14,7 +14,6 @@ require_once __DIR__ . '/config/Database.php';
 
 $database = new Database();
 $db = $database->getConnection();
-$db->exec("USE portrait_drawing_db");
 
 $requestUri = isset($_GET['request']) ? $_GET['request'] : '';
 $uriParts = explode('/', trim($requestUri, '/'));
