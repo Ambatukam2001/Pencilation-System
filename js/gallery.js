@@ -1,11 +1,11 @@
 // Gallery & Service Visualization Engine
 const DEFAULT_ARTWORKS = [
-    { id: 1, title: 'The Silent Gaze', category: 'Featured Pencil', size: 'A4', price: '1,500', img: 'images/gallery_1.jpg', fallback: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=1976&auto=format&fit=crop' },
-    { id: 2, title: 'Vibrant Soul', category: 'Digital Illustration', size: 'Digital', price: '2,200', img: 'images/gallery_2.jpg', fallback: 'https://images.unsplash.com/photo-1554151228-14d9def656e4?q=80&w=1972&auto=format&fit=crop' },
-    { id: 3, title: 'Midnight Shadow', category: 'Charcoal Study', size: 'A3', price: '2,800', img: 'images/gallery_3.jpg', fallback: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=1964&auto=format&fit=crop' },
-    { id: 4, title: 'Urban Profile', category: 'Mix Media', size: 'A4', price: '1,800', img: 'images/gallery_4.jpg', fallback: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=1974&auto=format&fit=crop' },
-    { id: 5, title: 'Reflection', category: 'Monochrome Pencil', size: 'A5', price: '900', img: 'images/gallery_5.jpg', fallback: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?q=80&w=1964&auto=format&fit=crop' },
-    { id: 6, title: 'Study in Grey', category: 'Graphite Sketch', size: 'A4', price: '1,200', img: 'images/gallery_6.jpg', fallback: 'https://images.unsplash.com/photo-1560707854-fb9a10eeaace?q=80&w=1974&auto=format&fit=crop' }
+    { id: 1, title: 'The Silent Gaze',   category: 'Pencil Realism',       size: 'A4',      img: 'images/portrait_sample.png', fallback: 'images/portrait_sample.png' },
+    { id: 2, title: 'Vibrant Soul',       category: 'Digital Illustration', size: 'Digital', img: 'images/digital_art.png',     fallback: 'images/digital_art.png' },
+    { id: 3, title: 'Midnight Shadow',    category: 'Colored Pencil',       size: 'A3',      img: 'images/colored.jpg',         fallback: 'images/colored.jpg' },
+    { id: 4, title: 'Graceful Glance',    category: 'Graphite Study',       size: '9x12in',  img: 'images/gallery_1.jpg',       fallback: 'images/portrait_sample.png' },
+    { id: 5, title: 'Portrait of ADEL',   category: 'Featured Work',        size: 'A4',      img: 'images/adel.JPG',            fallback: 'images/adel.JPG' },
+    { id: 6, title: 'Artist\'s Vision',   category: 'Mixed Media',          size: 'A3',      img: 'images/artist_adel.png',     fallback: 'images/artist_adel.png' }
 ];
 
 const DEFAULT_SERVICES = [

@@ -3,8 +3,9 @@ header("Access-Control-Allow-Origin: *");
 header("Content-Type: application/json; charset=UTF-8");
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
 header("Access-Control-Max-Age: 3600");
-header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
+header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
 
+// Handle CORS preflight
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit();
@@ -15,98 +16,132 @@ require_once __DIR__ . '/config/Database.php';
 $database = new Database();
 $db = $database->getConnection();
 
+// Parse  request URI from rewrite rule
 $requestUri = isset($_GET['request']) ? $_GET['request'] : '';
-$uriParts = explode('/', trim($requestUri, '/'));
+$uriParts   = explode('/', trim($requestUri, '/'));
+$method     = $_SERVER['REQUEST_METHOD'];
+$body       = json_decode(file_get_contents("php://input"), true) ?? [];
 
-$method = $_SERVER['REQUEST_METHOD'];
-$body = json_decode(file_get_contents("php://input"), true) ?? [];
-
-// Helper response function
+// --- Helper: Send JSON response ---
 function jsonResponse($data, $status = 200) {
     http_response_code($status);
-    echo json_encode($data);
+    if ($data === null) {
+        echo json_encode(['message' => 'Success']);
+    } else {
+        echo json_encode($data);
+    }
     exit;
 }
 
-// Router
-if ($uriParts[0] === 'bookings') {
+// --- Router ---
+$resource = $uriParts[0] ?? '';
+
+if ($resource === 'bookings') {
+    // POST /bookings — Public booking submission
     if ($method === 'POST') {
         require_once __DIR__ . '/controllers/BookingController.php';
-        $controller = new BookingController($db);
-        $controller->store($body);
+        (new BookingController($db))->store($body);
+    } else {
+        jsonResponse(['error' => 'Method not allowed'], 405);
     }
-} elseif ($uriParts[0] === 'services') {
+
+} elseif ($resource === 'services') {
+    // GET /services — Public services list
     if ($method === 'GET') {
         require_once __DIR__ . '/controllers/ServiceController.php';
-        $controller = new ServiceController($db);
-        $controller->index();
+        (new ServiceController($db))->index();
+    } else {
+        jsonResponse(['error' => 'Method not allowed'], 405);
     }
-} elseif ($uriParts[0] === 'rates') {
+
+} elseif ($resource === 'rates') {
+    // GET /rates — Public rates list
     if ($method === 'GET') {
         require_once __DIR__ . '/controllers/RateController.php';
-        $controller = new RateController($db);
-        $controller->index();
+        (new RateController($db))->index();
+    } else {
+        jsonResponse(['error' => 'Method not allowed'], 405);
     }
-} elseif ($uriParts[0] === 'artworks') {
+
+} elseif ($resource === 'artworks') {
+    // GET /artworks — Public gallery list
     if ($method === 'GET') {
         require_once __DIR__ . '/controllers/ArtworkController.php';
-        $controller = new ArtworkController($db);
-        $controller->index();
+        (new ArtworkController($db))->index();
+    } else {
+        jsonResponse(['error' => 'Method not allowed'], 405);
     }
-} elseif ($uriParts[0] === 'admin') {
-    $resource = isset($uriParts[1]) ? $uriParts[1] : '';
-    
-    if ($resource === 'bookings') {
+
+} elseif ($resource === 'admin') {
+    $subResource = $uriParts[1] ?? '';
+    $id          = $uriParts[2] ?? '';
+
+    // --- /admin/bookings ---
+    if ($subResource === 'bookings') {
         require_once __DIR__ . '/controllers/BookingController.php';
-        $controller = new BookingController($db);
-        
-        $action = isset($uriParts[2]) ? $uriParts[2] : '';
-        
-        if ($action === 'clear-archive' && $method === 'DELETE') {
-            $controller->clearArchive();
-        } elseif ($action === 'pending' && $method === 'GET') {
-            $controller->pending();
-        } elseif ($action !== '' && $method === 'PUT') {
-            $controller->update($action, $body);
-        } elseif ($action !== '' && $method === 'DELETE') {
-            $controller->delete($action);
+        $ctrl = new BookingController($db);
+
+        if ($id === 'clear-archive' && $method === 'DELETE') {
+            $ctrl->clearArchive();
+        } elseif ($id !== '' && $method === 'PUT') {
+            $ctrl->update($id, $body);
+        } elseif ($id !== '' && $method === 'DELETE') {
+            $ctrl->delete($id);
         } elseif ($method === 'GET') {
-            $controller->index();
+            $ctrl->index();
+        } else {
+            jsonResponse(['error' => 'Method not allowed'], 405);
         }
-    } elseif ($resource === 'services') {
+
+    // --- /admin/services ---
+    } elseif ($subResource === 'services') {
         require_once __DIR__ . '/controllers/ServiceController.php';
-        $controller = new ServiceController($db);
-        $id = isset($uriParts[2]) ? $uriParts[2] : '';
-        
+        $ctrl = new ServiceController($db);
+
         if ($method === 'GET') {
-            $controller->index();
+            $ctrl->index();
         } elseif ($method === 'PUT' && $id !== '') {
-            $controller->update($id, $body);
+            $ctrl->update($id, $body);
+        } else {
+            jsonResponse(['error' => 'Method not allowed'], 405);
         }
-    } elseif ($resource === 'rates') {
+
+    // --- /admin/rates ---
+    } elseif ($subResource === 'rates') {
         require_once __DIR__ . '/controllers/RateController.php';
-        $controller = new RateController($db);
-        $id = isset($uriParts[2]) ? $uriParts[2] : '';
+        $ctrl = new RateController($db);
 
         if ($method === 'GET') {
-            $controller->index();
+            $ctrl->index();
         } elseif ($method === 'PUT' && $id !== '') {
-            $controller->update($id, $body);
+            $ctrl->update($id, $body);
+        } else {
+            jsonResponse(['error' => 'Method not allowed'], 405);
         }
-    } elseif ($resource === 'artworks') {
+
+    // --- /admin/artworks ---
+    } elseif ($subResource === 'artworks') {
         require_once __DIR__ . '/controllers/ArtworkController.php';
-        $controller = new ArtworkController($db);
-        $id = isset($uriParts[2]) ? $uriParts[2] : '';
+        $ctrl = new ArtworkController($db);
 
         if ($method === 'GET') {
-            $controller->index();
+            $ctrl->index();
         } elseif ($method === 'POST') {
-            $controller->store($body);
+            $ctrl->store($body);
+        } elseif ($method === 'PUT' && $id !== '') {
+            // FIX: Was missing — now correctly handles editImage() from dashboard
+            $ctrl->update($id, $body);
         } elseif ($method === 'DELETE' && $id !== '') {
-            $controller->delete($id);
+            $ctrl->delete($id);
+        } else {
+            jsonResponse(['error' => 'Method not allowed'], 405);
         }
+
+    } else {
+        jsonResponse(['error' => 'Admin resource not found'], 404);
     }
+
 } else {
-    jsonResponse(["message" => "Endpoint not found"], 404);
+    jsonResponse(['error' => 'Endpoint not found'], 404);
 }
 ?>
