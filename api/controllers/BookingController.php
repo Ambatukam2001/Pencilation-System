@@ -13,12 +13,26 @@ class BookingController {
         jsonResponse($bookings);
     }
 
-    // GET /admin/bookings/pending — Pending bookings only
-    public function pending() {
-        $stmt = $this->db->query("SELECT * FROM bookings WHERE status = 'pending' ORDER BY created_at DESC");
-        $bookings = $stmt->fetchAll();
-        jsonResponse($bookings);
+    // GET /bookings/status/{email} — Get status of most recent active booking
+    public function status($email) {
+        if (empty($email)) {
+            jsonResponse(['error' => 'Email is required'], 422);
+            return;
+        }
+
+        $stmt = $this->db->prepare("SELECT * FROM bookings WHERE client_email = :email ORDER BY created_at DESC LIMIT 1");
+        $stmt->execute([':email' => $email]);
+        $booking = $stmt->fetch();
+
+        if (!$booking) {
+            jsonResponse(['status' => 'none'], 200);
+            return;
+        }
+
+        jsonResponse($booking);
     }
+
+    // POST /admin/bookings — Pending bookings only (legacy name check)
 
     // POST /bookings — Store new booking
     public function store($data) {
@@ -29,44 +43,36 @@ class BookingController {
         }
 
         // Sanitize and prepare deadline — convert empty string to NULL for DATE column
-        $deadline = !empty($data['deadline']) ? $data['deadline'] : null;
-
-        // Truncate base64 image data if too long for varchar(500)
-        // Store only a truncation flag; actual image data is too large for varchar
+        $deadline     = !empty($data['deadline']) ? $data['deadline'] : null;
         $referenceUrl = $data['reference_url'] ?? null;
         $receiptUrl   = $data['receipt_url'] ?? null;
 
-        // If data is base64 encoded, store as mediumtext-safe string (DB schema uses varchar(500))
-        // Truncate to 490 chars and flag it, or store full URL if it's a real URL path
-        if ($referenceUrl && strlen($referenceUrl) > 490) {
-            $referenceUrl = substr($referenceUrl, 0, 490);
+        try {
+            $sql = "INSERT INTO bookings 
+                        (client_name, client_email, client_phone, client_social, medium, size, address, deadline, payment_method, reference_url, receipt_url, status) 
+                    VALUES 
+                        (:client_name, :client_email, :client_phone, :client_social, :medium, :size, :address, :deadline, :payment_method, :reference_url, :receipt_url, 'pending')";
+
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([
+                ':client_name'     => trim($data['client_name']),
+                ':client_email'    => trim($data['client_email']),
+                ':client_phone'    => $data['client_phone'] ?? '',
+                ':client_social'   => $data['client_social'] ?? '',
+                ':medium'          => $data['medium'],
+                ':size'            => $data['size'] ?? '',
+                ':address'         => $data['address'] ?? '',
+                ':deadline'        => $deadline,
+                ':payment_method'  => $data['payment_method'] ?? '',
+                ':reference_url'   => $referenceUrl,
+                ':receipt_url'     => $receiptUrl
+            ]);
+
+            jsonResponse(['id' => $this->db->lastInsertId(), 'status' => 'pending', 'message' => 'Booking submitted successfully'], 201);
+        } catch (PDOException $e) {
+            // EXTREMELY IMPORTANT: Return the actual error to diagnose DB issues
+            jsonResponse(['error' => 'Database Error: ' . $e->getMessage()], 500);
         }
-        if ($receiptUrl && strlen($receiptUrl) > 490) {
-            $receiptUrl = substr($receiptUrl, 0, 490);
-        }
-
-        $sql = "INSERT INTO bookings 
-                    (client_name, client_email, client_phone, client_social, service_id, medium, size, address, deadline, payment_method, reference_url, receipt_url, status) 
-                VALUES 
-                    (:client_name, :client_email, :client_phone, :client_social, :service_id, :medium, :size, :address, :deadline, :payment_method, :reference_url, :receipt_url, 'pending')";
-
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute([
-            ':client_name'     => trim($data['client_name']),
-            ':client_email'    => trim($data['client_email']),
-            ':client_phone'    => $data['client_phone'] ?? '',
-            ':client_social'   => $data['client_social'] ?? '',
-            ':service_id'      => $data['service_id'] ?? null,
-            ':medium'          => $data['medium'],
-            ':size'            => $data['size'] ?? '',
-            ':address'         => $data['address'] ?? '',
-            ':deadline'        => $deadline,
-            ':payment_method'  => $data['payment_method'] ?? '',
-            ':reference_url'   => $referenceUrl,
-            ':receipt_url'     => $receiptUrl
-        ]);
-
-        jsonResponse(['id' => $this->db->lastInsertId(), 'status' => 'pending', 'message' => 'Booking submitted successfully'], 201);
     }
 
     // PUT /admin/bookings/{id} — Update booking status
@@ -86,11 +92,7 @@ class BookingController {
         $stmt = $this->db->prepare($sql);
         $stmt->execute([':status' => $data['status'], ':id' => (int)$id]);
 
-        if ($stmt->rowCount() === 0) {
-            jsonResponse(['error' => 'Booking not found'], 404);
-            return;
-        }
-
+        // SUCCESS: Identical status is fine
         jsonResponse(['message' => 'Status updated to ' . $data['status']]);
     }
 

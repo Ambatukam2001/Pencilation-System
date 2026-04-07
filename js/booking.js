@@ -103,6 +103,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(err.error || `Server error ${res.status}`);
             }
 
+            localStorage.setItem('last_booking_email', payload.client_email);
+
             await Swal.fire({
                 icon: 'success',
                 title: 'Commission Submitted!',
@@ -112,6 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             bookingForm.reset();
             if (paySelect) toggleGCashReceipt(paySelect);
+            if (typeof checkBookingNotification === 'function') checkBookingNotification();
 
         } catch (err) {
             console.error('Booking Error:', err);

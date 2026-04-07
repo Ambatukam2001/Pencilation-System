@@ -11,7 +11,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const dashboardRole = document.getElementById('dashboard-user-role');
 
     // Handle Admin Logic
-    const isAdmin = (storedRole === 'admin' || role === 'admin');
+    // On dashboard.php, admin is always true (PHP-protected page)
+    const isAdmin = true;
 
     if(isAdmin) {
         if(dashboardName) dashboardName.textContent = "ADEL";
@@ -19,7 +20,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if(headerTitle) headerTitle.textContent = "OVERVIEW";
         const adminControls = document.getElementById('admin-map-controls');
         if(adminControls) adminControls.classList.remove('hidden');
-        renderAdminRequests();
+
+        // ── Boot from PHP-seeded data (instant, no extra fetch needed) ──
+        if (window._currentBookings && window._currentBookings.length >= 0) {
+            // Rows are already rendered server-side; just init charts & icons
+            initStatsCharts(window._currentBookings);
+            lucide.createIcons();
+        } else {
+            // Fallback: fetch from API if PHP data not available
+            syncDashboardData();
+        }
     } else {
         if(headerTitle) headerTitle.textContent = storedName || "Guest User";
         if(dashboardRole) dashboardRole.textContent = "Client Profile";
@@ -40,16 +50,36 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 1. Render Admin Requests from API/Supabase
-    async function renderAdminRequests() {
-        const bookingsTable = document.querySelector('tbody');
+    // ── Unified Data Sync — full API re-fetch & re-render ──────────
+    // Called explicitly by: Refresh button, updateBookingStatus(), deleteHistoryEntry()
+    window.syncDashboardData = async () => {
+        const bookingsTable = document.getElementById('request-tbody');
+        if (!bookingsTable) return;
+        
+        try {
+            const ts = new Date().getTime();
+            const response = await fetch(`${CONFIG.API_URL}/admin/bookings?_t=${ts}`);
+            if (!response.ok) throw new Error('API Sync Failed');
+            const bookings = await response.json();
+
+            await renderAdminRequests(bookings);
+            initStatsCharts(bookings);
+        } catch (error) {
+            console.error("Dashboard Sync Error:", error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Sync Failed',
+                text: 'Could not reach the server. Check XAMPP is running.',
+                confirmButtonColor: '#1A1A1A'
+            });
+        }
+    };
+
+    window.renderAdminRequests = async (bookings) => {
+        window._currentBookings = bookings; // Cache globally to avoid enormous base64 strings in inline HTML
+        const bookingsTable = document.getElementById('request-tbody');
         const historyTable = document.getElementById('history-list-body');
         if(!bookingsTable) return;
-
-        try {
-            const response = await fetch(`${CONFIG.API_URL}/admin/bookings`);
-            if(!response.ok) throw new Error('API Sync Failed');
-            const bookings = await response.json();
             
             // Update Stats
             const totalReqEl = document.getElementById('total-requests-stat');
@@ -60,7 +90,8 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if(galleryCountEl) {
                 // We'll fetch artworks count from API in a real scenario, but for now use the list
-                const artRes = await fetch(`${CONFIG.API_URL}/artworks`);
+                const artTs = new Date().getTime();
+                const artRes = await fetch(`${CONFIG.API_URL}/artworks?_t=${artTs}`);
                 const gallery = await artRes.json();
                 galleryCountEl.textContent = gallery.length.toString().padStart(2, '0');
             }
@@ -87,7 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </td>
                         <td class="py-10 px-4">
                             <div class="flex flex-col items-center justify-center space-y-2">
-                                <button onclick="viewAddress('${book.address || 'Standard Location'}')" class="w-10 h-10 bg-[#C16053]/5 text-[#C16053] rounded-full flex items-center justify-center hover:bg-[#C16053] hover:text-white transition-all shadow-sm">
+                                <button onclick="viewAddress(${book.id})" class="w-10 h-10 bg-[#C16053]/5 text-[#C16053] rounded-full flex items-center justify-center hover:bg-[#C16053] hover:text-white transition-all shadow-sm">
                                     <i data-lucide="home" class="w-4 h-4"></i>
                                 </button>
                                 <span class="text-[8px] font-black uppercase text-gray-300 tracking-tighter truncate max-w-[60px]">${book.address || 'N/A'}</span>
@@ -100,14 +131,14 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                         </td>
                         <td class="py-10 px-4">
-                            <button onclick="viewReferencePhoto('${book.reference_url}')" class="text-[9px] font-black uppercase tracking-[0.2em] px-5 py-3 bg-[#1A1A1A] text-white rounded-xl hover:bg-[#C16053] transition-all shadow-lg">
+                            <button onclick="viewReferencePhoto(${book.id})" class="text-[9px] font-black uppercase tracking-[0.2em] px-5 py-3 bg-[#1A1A1A] text-white rounded-xl hover:bg-[#C16053] transition-all shadow-lg">
                                 Open Photo
                             </button>
                         </td>
                         <td class="py-10 px-4">
                             <div class="flex flex-col space-y-2">
                                 <span class="font-bold text-sm">₱${book.medium === 'digital' ? '2,200' : '1,500'}</span>
-                                <button onclick="viewPayment('${book.receipt_url}', '${book.payment_method}')" class="text-[9px] uppercase font-black tracking-widest py-1 px-3 ${book.receipt_url ? 'bg-green-600' : 'bg-[#1A1A1A]'} text-white rounded-md hover:bg-[#C16053] transition-colors w-fit tracking-[0.2em]">${book.payment_method}</button>
+                                <button onclick="viewPayment(${book.id})" class="text-[9px] uppercase font-black tracking-widest py-1 px-3 ${book.receipt_url && book.receipt_url !== 'null' ? 'bg-green-600' : 'bg-[#1A1A1A]'} text-white rounded-md hover:bg-[#C16053] transition-colors w-fit tracking-[0.2em]">${book.payment_method}</button>
                             </div>
                         </td>
                         <td class="py-10 px-4 text-right">
@@ -152,9 +183,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             lucide.createIcons();
-        } catch (error) {
-            console.error("Dashboard Sync Error:", error);
-        }
     }
 
     // Individual History Deletion
@@ -179,7 +207,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         icon: 'success',
                         title: 'Erased!',
                         confirmButtonColor: '#1A1A1A'
-                    }).then(() => renderAdminRequests());
+                    }).then(() => syncDashboardData());
                 } catch (error) {
                     console.error("Delete Error:", error);
                 }
@@ -205,7 +233,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                     if(!response.ok) throw new Error('Clear Archive Failed');
                     
-                    renderAdminRequests();
+                    syncDashboardData();
                     Swal.fire({
                         icon: 'success',
                         title: 'Archive Cleared',
@@ -222,7 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
         switch(status) {
             case 'pending': return 'bg-yellow-50 text-yellow-600 border border-yellow-100';
             case 'accepted': return 'bg-green-50 text-green-600 border border-green-100';
-            case 'declined': return 'bg-red-50 text-red-600 border border-red-100';
+            case 'rejected': return 'bg-red-50 text-red-600 border border-red-100';
             default: return 'bg-gray-50 text-gray-400';
         }
     }
@@ -241,7 +269,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 title: `Commission ${status.toUpperCase()}`,
                 text: `Database updated and notification synced.`,
                 confirmButtonColor: '#1A1A1A'
-            }).then(() => renderAdminRequests());
+            }).then(() => syncDashboardData());
         } catch (error) {
             console.error("Status Update Error:", error);
             Swal.fire({
@@ -267,7 +295,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // 4. Admin Meet-up Address Viewer (Dynamic Map with Leaflet Support)
-    window.viewAddress = (adr) => {
+    window.viewAddress = (id) => {
+        const book = window._currentBookings?.find(b => b.id == id);
+        if(!book) return;
+        const adr = book.address || 'Standard Location';
+
         const isCoord = adr.includes('📍 Map Location:');
         let lat = 14.5492, lng = 121.0450; // Default BGC
         
@@ -307,67 +339,68 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    // 5. Simulated Real-Time Updates (Auto-refresh on storage change)
-    window.addEventListener('storage', (e) => {
-        if(e.key === 'bookings') {
-            console.log("Real-time Update: Syncing new requests...");
-            renderAdminRequests();
-        }
-    });
-
-    // 5. View GCash Receipt
-    window.viewPayment = (receiptData, method) => {
-        if(method !== 'gcash' || !receiptData || receiptData === 'null' || receiptData === '') {
+    // ── Image Viewer Helper ────────────────────────────────────
+    const showImageModal = (title, subtitle, imageUrl, icon = 'info') => {
+        if (!imageUrl || imageUrl === 'null' || imageUrl === 'undefined' || imageUrl === '') {
             Swal.fire({
-                icon: 'info',
-                title: 'No Digital Receipt',
-                text: method === 'gcash' 
-                    ? 'The client selected GCash but did not upload a screenshot.'
-                    : 'This client selected Cash-on-Meetup. No digital receipt was provided.',
+                icon,
+                title: `No ${title}`,
+                text: `The client did not provide a ${title.toLowerCase()} for this commission.`,
                 confirmButtonColor: '#1A1A1A'
             });
             return;
         }
 
         Swal.fire({
-            title: 'GCash Payment Receipt',
-            html: '<p class="text-[9px] font-black uppercase tracking-[0.2em] mb-4 text-[#C16053]">Transaction Verification</p>',
-            imageUrl: receiptData,
+            title: title + ' Review',
+            html: `<p class="text-[9px] font-black uppercase tracking-[0.2em] mb-4 text-[#C16053]">${subtitle}</p>`,
+            imageUrl: imageUrl,
             imageWidth: '100%',
-            imageAlt: 'GCash Receipt',
+            imageAlt: title,
             confirmButtonColor: '#1A1A1A',
-            confirmButtonText: 'Verify & Close',
+            confirmButtonText: 'Close & Verify',
             customClass: {
-                image: 'rounded-3xl border-4 border-gray-100 shadow-2xl'
+                image: 'rounded-[3rem] border-4 border-gray-50 shadow-2xl max-h-[70vh] object-contain'
             }
         });
+    };
+
+    // 5. View GCash Receipt
+    window.viewPayment = (id) => {
+        const book = window._currentBookings?.find(b => b.id == id);
+        if (!book) return;
+        
+        if (book.payment_method !== 'gcash') {
+            Swal.fire({
+                icon: 'info',
+                title: 'Offline Payment',
+                text: 'This client selected Cash-on-Meetup. No digital receipt was provided.',
+                confirmButtonColor: '#1A1A1A'
+            });
+            return;
+        }
+        showImageModal('GCash Receipt', 'Transaction Verification', book.receipt_url);
     };
 
     // 6. View Reference Photo
-    window.viewReferencePhoto = (photoData) => {
-        if(!photoData || photoData === 'null' || photoData === '' || photoData === 'undefined') {
-            Swal.fire({
-                icon: 'info',
-                title: 'No Reference Photo',
-                text: 'The client did not upload a reference photo for this commission.',
-                confirmButtonColor: '#1A1A1A'
-            });
-            return;
-        }
-
-        Swal.fire({
-            title: 'Reference Photo',
-            html: '<p class="text-[9px] font-black uppercase tracking-[0.2em] mb-4 text-[#C16053]">Client Request</p>',
-            imageUrl: photoData,
-            imageWidth: '100%',
-            imageAlt: 'Reference Photo',
-            confirmButtonColor: '#1A1A1A',
-            confirmButtonText: 'Close',
-            customClass: {
-                image: 'rounded-3xl border-4 border-gray-100 shadow-2xl max-h-[70vh] object-contain'
-            }
-        });
+    window.viewReferencePhoto = (id) => {
+        const book = window._currentBookings?.find(b => b.id == id);
+        if (!book) return;
+        
+        showImageModal('Reference Photo', 'Client Request Details', book.reference_url);
     };
+
+    // ── Real-Time Sync Utility ────────────────────────────────
+    window.addEventListener('storage', (e) => {
+        if (e.key === 'bookings' || e.key === 'is_live_session') {
+            if (typeof renderAdminRequests === 'function') renderAdminRequests();
+            if (typeof renderGallery === 'function') renderGallery();
+        }
+    });
+
+    if (isAdmin) {
+        syncDashboardData();
+    }
 });
 
 // ── Admin Gallery Renderer ───────────────────────────────────
@@ -396,12 +429,13 @@ window.renderGallery = async () => {
         }
 
         container.innerHTML = artworks.map(art => `
-            <div class="portrait-card group w-full"
+            <div class="portrait-card group w-full relative overflow-hidden"
                  data-id="${art.id}"
                  data-title="${(art.title || '').replace(/"/g, '&quot;')}"
                  data-category="${(art.category || '').replace(/"/g, '&quot;')}"
-                 data-size="${(art.size || '').replace(/"/g, '&quot;')}">
-                <img src="${art.image_url || 'images/portrait_sample.png'}"
+                 data-size="${(art.size || '').replace(/"/g, '&quot;')}"
+                 data-img="${art.image_url || ''}">
+                <img src="${buildImgUrl(art.image_url)}"
                      alt="${art.title}"
                      onerror="this.src='images/portrait_sample.png'">
 
@@ -438,7 +472,36 @@ window.renderGallery = async () => {
     }
 };
 
-// ── Delete Artwork ────────────────────────────────────────────
+// ── Shared Modal Utilities ───────────────────────────────────
+const SWAL_MODAL_STYLE = `
+    <style>
+        .swal2-input { color: #1A1A1A !important; font-family: 'Outfit', sans-serif; font-size: 13px!important; margin: 8px auto!important; border-radius: 12px!important; border: 1px solid #eee!important; width: 100%!important; box-sizing: border-box!important; height: 3rem!important;}
+        .swal-label  { font-size: 9px; font-weight: 900; text-transform: uppercase; color: #C16053; display: block; text-align: left; margin-top: 10px; letter-spacing: 1px;}
+        .preview-overlay { border: 2px dashed #eee; border-radius: 12px; margin-top: 15px; position: relative; overflow: hidden; background: #fafafa; }
+    </style>
+`;
+
+async function uploadImageToServer(file, statusEl) {
+    if (!file) return null;
+    try {
+        if (statusEl) { statusEl.textContent = 'Uploading…'; statusEl.className = 'text-[9px] text-yellow-600 font-bold mt-1'; }
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await fetch(CONFIG.UPLOAD_URL, { method: 'POST', body: formData });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        if (statusEl) { statusEl.textContent = `✓ Uploaded: ${data.filename}`; statusEl.className = 'text-[9px] text-green-600 font-bold mt-1'; }
+        return data.path;
+    } catch (e) {
+        if (statusEl) { statusEl.textContent = '✗ Upload Failed'; statusEl.className = 'text-[9px] text-red-500 font-bold mt-1'; }
+        throw e;
+    }
+}
+
+// ── Gallery Actions (Add/Edit/Delete) ─────────────────────────
 window.deleteImage = (btn) => {
     const card  = btn.closest('.portrait-card');
     const artId = card?.getAttribute('data-id');
@@ -460,278 +523,264 @@ window.deleteImage = (btn) => {
             card.style.transition = 'all 0.4s ease';
             card.style.transform  = 'scale(0)';
             card.style.opacity    = '0';
-            setTimeout(() => renderGallery(), 450);
+            setTimeout(() => {
+                renderGallery();
+                localStorage.setItem('gallery_updated', Date.now());
+            }, 450);
         } catch (err) {
             Swal.fire({ icon: 'error', title: 'Delete Failed', text: err.message, confirmButtonColor: '#1A1A1A' });
         }
     });
 };
 
-// ── Edit Artwork ─────────────────────────────────────────────
-window.editImage = (btn) => {
-    const card     = btn.closest('.portrait-card');
-    const artId    = card?.getAttribute('data-id');
-    // Read from data attributes — not from DOM text (avoids wrong element selection)
-    const title    = card?.getAttribute('data-title')    || '';
-    const category = card?.getAttribute('data-category') || '';
-    const size     = card?.getAttribute('data-size')     || '';
+// Unified Gallery Entry Modal (Shared for Add & Edit)
+async function showGalleryModal(mode, data = {}) {
+    const isEdit = mode === 'edit';
+    const artId  = data.id || null;
 
-    Swal.fire({
-        title: 'Edit Artwork',
+    const { value: formValue } = await Swal.fire({
+        title: isEdit ? 'Edit Artwork' : 'New Gallery Addition',
         html: `
-            <style>.swal2-input{color:#1A1A1A!important;font-family:'Outfit',sans-serif;font-size:14px;margin:8px auto}.swal-label{font-size:10px;font-weight:900;text-transform:uppercase;color:#C16053;display:block;text-align:left;margin-left:3rem;margin-top:10px}</style>
-            <label class="swal-label">Artwork Title</label>
-            <input id="swal-title" class="swal2-input" value="${title}">
-            <label class="swal-label">Media Category</label>
-            <input id="swal-category" class="swal2-input" value="${category}">
-            <label class="swal-label">Physical Size</label>
-            <input id="swal-size" class="swal2-input" value="${size}">
-        `,
-        focusConfirm: false,
-        confirmButtonColor: '#1A1A1A',
-        showCancelButton: true,
-        preConfirm: () => ({
-            title:    document.getElementById('swal-title').value.trim(),
-            category: document.getElementById('swal-category').value.trim(),
-            size:     document.getElementById('swal-size').value.trim()
-        })
-    }).then(async (result) => {
-        if (!result.isConfirmed || !result.value?.title) return;
-        try {
-            const res = await fetch(`${CONFIG.API_URL}/admin/artworks/${artId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(result.value)
-            });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            await renderGallery();
-            Swal.fire({ icon: 'success', title: 'Updated!', timer: 1500, showConfirmButton: false });
-        } catch (err) {
-            Swal.fire({ icon: 'error', title: 'Update Failed', text: err.message, confirmButtonColor: '#1A1A1A' });
-        }
-    });
-};
-
-// 7. Add Artwork Modal — uploads image first, then saves path to DB
-window.addArtworkModal = () => {
-    Swal.fire({
-        title: 'New Gallery Addition',
-        html: `
-            <style>
-                .swal2-input { color: #1A1A1A !important; font-family: 'Outfit', sans-serif; font-size: 13px; margin: 8px auto; border-radius: 12px; border: 1px solid #eee; width: 100%; box-sizing: border-box; }
-                .swal-label  { font-size: 9px; font-weight: 900; text-transform: uppercase; color: #C16053; display: block; text-align: left; margin-top: 10px; }
-            </style>
-            <div class="text-left px-4">
+            ${SWAL_MODAL_STYLE}
+            <div class="text-left px-5">
                 <label class="swal-label">Artwork Title</label>
-                <input id="add-title" class="swal2-input" placeholder="e.g. The Soulful Stroke">
+                <input id="sw-title" class="swal2-input" value="${data.title || ''}" placeholder="The Masterpiece">
 
                 <label class="swal-label">Media Category</label>
-                <input id="add-category" class="swal2-input" placeholder="e.g. Charcoal on Vellum">
+                <input id="sw-category" class="swal2-input" value="${data.category || ''}" placeholder="Graphite Study">
 
-                <label class="swal-label">Standard Size</label>
-                <input id="add-size" class="swal2-input" placeholder="e.g. 12x18 inches">
+                <label class="swal-label">Physical Size</label>
+                <input id="sw-size" class="swal2-input" value="${data.size || ''}" placeholder="A4 or 12x18">
 
-                <label class="swal-label">Upload Artwork Image</label>
-                <input type="file" id="add-img-file" class="swal2-input p-3 cursor-pointer" accept="image/*" onchange="previewAddArtwork(this)">
-                <div id="add-img-preview-wrap" class="mt-3 hidden">
-                    <img id="add-img-preview" class="w-full h-40 object-cover rounded-xl border border-gray-100" alt="Preview">
-                    <p id="add-upload-status" class="text-[9px] text-yellow-600 font-bold mt-1">Ready to upload</p>
+                <label class="swal-label">${isEdit ? 'Update Image (Optional)' : 'Upload Artwork Image'}</label>
+                <div class="relative mt-2 mb-4 w-full group">
+                    <label for="sw-file" class="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gray-200 rounded-[1rem] cursor-pointer bg-gray-50 hover:bg-[#C16053]/5 hover:border-[#C16053]/50 transition-all duration-300">
+                        <div class="flex flex-col items-center justify-center pointer-events-none">
+                            <svg class="w-6 h-6 mb-2 text-gray-300 group-hover:text-[#C16053] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                            <p class="text-[9px] uppercase font-black tracking-[0.2em] text-gray-400 group-hover:text-[#C16053] transition-colors">Select or Drag Media</p>
+                        </div>
+                        <input id="sw-file" type="file" class="hidden" accept="image/*" onchange="previewImageInModal(this, 'sw-preview-img', 'sw-status')" />
+                    </label>
+                </div>
+                <div id="sw-preview-wrap" class="preview-overlay ${isEdit ? '' : 'hidden'}">
+                    <img id="sw-preview-img" src="${buildImgUrl(data.image_url)}" class="w-full h-44 object-cover" alt="Preview">
+                    <p id="sw-status" class="absolute bottom-2 right-2 bg-black/60 text-white text-[9px] px-2 py-1 rounded backdrop-blur-sm">
+                        ${isEdit ? 'Current Image' : 'No file picked'}
+                    </p>
                 </div>
             </div>
         `,
         focusConfirm: false,
         confirmButtonColor: '#1A1A1A',
-        confirmButtonText: 'Publish to Gallery',
+        confirmButtonText: isEdit ? 'Save Changes' : 'Publish to Gallery',
         showCancelButton: true,
-        cancelButtonText: 'Discard',
+        cancelButtonText: 'Cancel',
         preConfirm: async () => {
-            const title    = document.getElementById('add-title').value.trim();
-            const category = document.getElementById('add-category').value.trim();
-            const size     = document.getElementById('add-size').value.trim();
-            const fileInput = document.getElementById('add-img-file');
+            const title    = document.getElementById('sw-title').value.trim();
+            const category = document.getElementById('sw-category').value.trim();
+            const size     = document.getElementById('sw-size').value.trim();
+            const file     = document.getElementById('sw-file').files[0];
 
             if (!title || !category) {
                 Swal.showValidationMessage('Title and Category are required');
                 return false;
             }
-            if (!fileInput.files.length) {
-                Swal.showValidationMessage('Please select an image file');
+
+            if (!isEdit && !file) {
+                Swal.showValidationMessage('Image file is required for new entries');
                 return false;
             }
 
-            // Upload image to server
-            const statusEl = document.getElementById('add-upload-status');
-            try {
-                if (statusEl) statusEl.textContent = 'Uploading image…';
-                const formData = new FormData();
-                formData.append('file', fileInput.files[0]);
-                const upRes = await fetch(CONFIG.UPLOAD_URL, { method: 'POST', body: formData });
-                if (!upRes.ok) {
-                    const e = await upRes.json().catch(() => ({}));
-                    Swal.showValidationMessage('Upload failed: ' + (e.error || `HTTP ${upRes.status}`));
+            let image_url = data.image_url || '';
+            if (file) {
+                try {
+                    image_url = await uploadImageToServer(file, document.getElementById('sw-status'));
+                } catch (e) {
+                    Swal.showValidationMessage(`Upload error: ${e.message}`);
                     return false;
                 }
-                const upData = await upRes.json();
-                if (statusEl) statusEl.textContent = '✓ Uploaded: ' + upData.filename;
-                return { title, category, size, image_url: upData.path };
-            } catch (e) {
-                Swal.showValidationMessage('Upload error: ' + e.message);
-                return false;
             }
-        }
-    }).then(async (result) => {
-        if (!result.isConfirmed || !result.value) return;
-        try {
-            const res = await fetch(`${CONFIG.API_URL}/admin/artworks`, {
-                method:  'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify(result.value)
-            });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            await renderGallery();
-            Swal.fire({ icon: 'success', title: 'Artwork Published!', text: 'Your new masterpiece is now live in the gallery.', confirmButtonColor: '#1A1A1A' });
-        } catch (err) {
-            Swal.fire({ icon: 'error', title: 'Publish Failed', text: err.message, confirmButtonColor: '#C16053' });
+            return { title, category, size, image_url };
         }
     });
-};
 
-// Live preview inside artwork modal
-window.previewAddArtwork = (input) => {
-    const wrap = document.getElementById('add-img-preview-wrap');
-    const img  = document.getElementById('add-img-preview');
-    if (!input.files[0] || !wrap || !img) return;
-    wrap.classList.remove('hidden');
-    const reader = new FileReader();
-    reader.onload = (e) => { img.src = e.target.result; };
-    reader.readAsDataURL(input.files[0]);
-};
-
-
-
-// ── Load Services into Form (from DB) ────────────────────────
-window.loadServicesToForm = async () => {
-    const DEFAULTS = [
-        { id: 1, title: 'Pencil Realism Art',  description: '"BINI Mikha" - A breathtaking hyper-realistic pencil portrait.',   image_url: 'images/portrait_sample.png' },
-        { id: 2, title: 'Colored Drawing Art',  description: '"Evil Demon Slayer" - Triple-panel illustration with vibrant colored pencils.', image_url: 'images/colored.jpg' },
-        { id: 3, title: 'Digital Masterpiece',  description: '"ASEAN Diversity" - A professional digital commission.',                         image_url: 'images/digital_art.png'     }
-    ];
-
-    // Build correct image src for dashboard preview
-    const previewSrc = (rawPath) => {
-        if (!rawPath || rawPath.startsWith('data:')) return 'images/portrait_sample.png';
-        if (rawPath.startsWith('http')) {
-            // Try to extract relative path from absolute URL (old bad data)
-            const match = rawPath.match(/\/images\/(.+)$/);
-            return match ? `images/${match[1]}` : 'images/portrait_sample.png';
+    if (formValue) {
+        try {
+            const url    = isEdit ? `${CONFIG.API_URL}/admin/artworks/${artId}` : `${CONFIG.API_URL}/admin/artworks`;
+            const method = isEdit ? 'PUT' : 'POST';
+            
+            const res = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify(formValue)
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            
+            renderGallery();
+            localStorage.setItem('gallery_updated', Date.now());
+            Swal.fire({ icon: 'success', title: isEdit ? 'Entry Updated' : 'Entry Published', confirmButtonColor: '#1A1A1A', timer: 2000 });
+        } catch (err) {
+            Swal.fire({ icon: 'error', title: 'Action Failed', text: err.message, confirmButtonColor: '#C16053' });
         }
-        return rawPath; // Clean relative path
+    }
+}
+
+// Global modal triggers
+window.addArtworkModal = () => showGalleryModal('add');
+window.editImage = (btn) => {
+    const card = btn.closest('.portrait-card');
+    const data = {
+        id:        card.dataset.id,
+        title:     card.dataset.title,
+        category:  card.dataset.category,
+        size:      card.dataset.size,
+        image_url: card.dataset.img
     };
+    showGalleryModal('edit', data);
+};
 
-    const applyService = (service, i) => {
-        const titleEl   = document.getElementById(`service-${i}-title`);
-        const descEl    = document.getElementById(`service-${i}-desc`);
-        const previewEl = document.getElementById(`service-${i}-preview`);
-        const pathEl    = document.getElementById(`service-${i}-path`);
-        const statusEl  = document.getElementById(`service-${i}-status`);
+// ── Universal Image Previewer for Modals ────────────────────
+window.previewImageInModal = (input, previewId, statusId) => {
+    const preview = document.getElementById(previewId);
+    const status  = document.getElementById(statusId);
+    const file    = input.files[0];
+    if (!file || !preview) return;
 
-        const cleanPath = previewSrc(service.image_url || '');
+    if (status) {
+        status.textContent = '📎 Asset Staged';
+        status.classList.remove('hidden');
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => { preview.src = e.target.result; };
+    reader.readAsDataURL(file);
+};
 
-        if (titleEl)   { titleEl.value     = service.title || '';        titleEl.dataset.dbId = service.id; }
-        if (descEl)      descEl.value      = service.description || '';
-        if (previewEl)   previewEl.src     = cleanPath;
-        if (pathEl)      pathEl.value      = cleanPath;
-        if (statusEl)    statusEl.textContent = 'No file selected';
-    };
+
+
+// ── 8. Services Management — Dynamic Modal Logic ────────────────
+window.renderServicesEditor = async () => {
+    const grid = document.getElementById('services-manager-grid');
+    if (!grid) return;
+
+    grid.innerHTML = `
+        <div class="col-span-full py-20 text-center">
+            <div class="inline-block w-8 h-8 border-4 border-[#C16053] border-t-transparent rounded-full animate-spin"></div>
+        </div>`;
 
     try {
         const res = await fetch(`${CONFIG.API_URL}/admin/services`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const services = await res.json();
-        const data = (services && services.length) ? services : DEFAULTS;
-        data.forEach((s, idx) => applyService(s, idx + 1));
+
+        if (!services.length) {
+            grid.innerHTML = '<p class="col-span-full py-20 text-center opacity-30 font-black uppercase text-[10px] tracking-widest italic">No services defined in database</p>';
+            return;
+        }
+
+        grid.innerHTML = services.map(s => `
+            <div class="bg-white p-10 rounded-[3rem] shadow-sm border border-gray-50 flex flex-col justify-between group hover:border-[#C16053] transition-all">
+                <div class="space-y-6">
+                    <div class="flex justify-between items-start">
+                        <span class="text-[9px] font-black uppercase tracking-widest text-[#C16053] bg-[#C16053]/5 px-3 py-1 rounded-full">OFFERING</span>
+                        <button onclick='editServiceModal(${JSON.stringify(s).replace(/'/g, "&apos;")})' class="text-[#1A1A1A] hover:text-[#C16053] transition-colors">
+                            <i data-lucide="edit-3" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                    <div class="w-full aspect-video bg-gray-50 rounded-2xl overflow-hidden relative">
+                        <img src="${buildImgUrl(s.image_url)}" class="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" alt="${s.title}">
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-black uppercase tracking-tight mb-2 truncate">${s.title}</h3>
+                        <p class="text-[10px] leading-relaxed opacity-50 line-clamp-3">${s.description || 'No description provided.'}</p>
+                    </div>
+                </div>
+                <button onclick='editServiceModal(${JSON.stringify(s).replace(/'/g, "&apos;")})' 
+                        class="mt-8 w-full py-4 border-2 border-gray-50 text-[9px] font-black uppercase tracking-widest rounded-2xl hover:bg-[#1A1A1A] hover:text-white hover:border-[#1A1A1A] transition-all">
+                    Configure Offering
+                </button>
+            </div>
+        `).join('');
+        lucide.createIcons();
     } catch (err) {
-        console.error('Load Services Error:', err);
-        DEFAULTS.forEach((s, idx) => applyService(s, idx + 1));
+        grid.innerHTML = `<p class="col-span-full py-10 text-center text-red-500 font-bold text-xs uppercase tracking-widest">Error: ${err.message}</p>`;
     }
 };
 
-// ── Upload file to server, get back relative path ──────────
-async function uploadImageFile(file, statusEl) {
-    if (statusEl) { statusEl.textContent = 'Uploading…'; statusEl.className = 'text-[9px] text-yellow-600 font-bold mt-1'; }
-    const formData = new FormData();
-    formData.append('file', file);
-    const res = await fetch(CONFIG.UPLOAD_URL, { method: 'POST', body: formData });
-    if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `Upload failed (HTTP ${res.status})`);
-    }
-    return await res.json(); // { path, filename, size, type }
-}
+window.editServiceModal = async (service) => {
+    const { value: formValue } = await Swal.fire({
+        title: 'Customize Offering',
+        html: `
+            ${SWAL_MODAL_STYLE}
+            <div class="text-left px-5">
+                <label class="swal-label">Offering Name</label>
+                <input id="se-title" class="swal2-input" value="${service.title || ''}">
 
-// ── Service image: upload on file select ─────────────────────
-window.previewServiceImage = async (i) => {
-    const fileInput = document.getElementById(`service-${i}-file`);
-    const previewEl = document.getElementById(`service-${i}-preview`);
-    const pathEl    = document.getElementById(`service-${i}-path`);
-    const statusEl  = document.getElementById(`service-${i}-status`);
-    const file      = fileInput?.files[0];
-    if (!file) return;
+                <label class="swal-label">Summary / Description</label>
+                <textarea id="se-desc" class="swal2-input !h-32 p-4 resize-none leading-relaxed" placeholder="Tell the world about this service...">${service.description || ''}</textarea>
 
-    // Immediate local preview
-    const reader  = new FileReader();
-    reader.onload = (e) => { if (previewEl) previewEl.src = e.target.result; };
-    reader.readAsDataURL(file);
+                <label class="swal-label">Update Feature Image</label>
+                <div class="relative mt-2 mb-4 w-full group">
+                    <label for="se-file" class="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gray-200 rounded-[1rem] cursor-pointer bg-gray-50 hover:bg-[#C16053]/5 hover:border-[#C16053]/50 transition-all duration-300">
+                        <div class="flex flex-col items-center justify-center pointer-events-none">
+                            <svg class="w-6 h-6 mb-2 text-gray-300 group-hover:text-[#C16053] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                            <p class="text-[9px] uppercase font-black tracking-[0.2em] text-gray-400 group-hover:text-[#C16053] transition-colors">Select or Drag Media</p>
+                        </div>
+                        <input id="se-file" type="file" class="hidden" accept="image/*" onchange="previewServiceImageInModal(this)" />
+                    </label>
+                </div>
+                
+                <div id="se-preview-wrap" class="preview-overlay">
+                    <img id="se-preview-img" src="${buildImgUrl(service.image_url)}" class="w-full h-44 object-cover" alt="Preview">
+                    <p id="se-status" class="absolute bottom-2 right-2 bg-black/60 text-white text-[9px] px-2 py-1 rounded backdrop-blur-sm">Current Asset</p>
+                </div>
+            </div>
+        `,
+        focusConfirm: false,
+        confirmButtonColor: '#1A1A1A',
+        confirmButtonText: 'Save Offering Changes',
+        showCancelButton: true,
+        preConfirm: async () => {
+            const title       = document.getElementById('se-title').value.trim();
+            const description = document.getElementById('se-desc').value.trim();
+            const file        = document.getElementById('se-file').files[0];
 
-    try {
-        const data = await uploadImageFile(file, statusEl);
-        if (pathEl) pathEl.value = data.path; // e.g. "images/portrait_abc123.jpg"
-        if (statusEl) { statusEl.textContent = '✓ Uploaded: ' + data.filename; statusEl.className = 'text-[9px] text-green-600 font-bold mt-1'; }
-    } catch (err) {
-        if (statusEl) { statusEl.textContent = '✗ ' + err.message; statusEl.className = 'text-[9px] text-red-500 font-bold mt-1'; }
-        Swal.fire({ icon: 'error', title: 'Upload Failed', text: err.message, confirmButtonColor: '#C16053' });
-    }
-};
+            if (!title) {
+                Swal.showValidationMessage('A name is required for your offering');
+                return false;
+            }
 
-// ── Save Services to DB ───────────────────────────────────────
-window.saveServices = async () => {
-    Swal.fire({ title: 'Saving Services…', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-    try {
-        const errors = [];
-        for (let i = 1; i <= 3; i++) {
-            const titleEl = document.getElementById(`service-${i}-title`);
-            const descEl  = document.getElementById(`service-${i}-desc`);
-            const pathEl  = document.getElementById(`service-${i}-path`);
-            if (!titleEl) continue;
+            let image_url = service.image_url;
+            if (file) {
+                try {
+                    image_url = await uploadImageToServer(file, document.getElementById('se-status'));
+                } catch (e) {
+                    Swal.showValidationMessage(`Upload error: ${e.message}`);
+                    return false;
+                }
+            }
+            return { title, description, image_url };
+        }
+    });
 
-            const id          = titleEl.dataset.dbId;
-            const title       = titleEl.value.trim();
-            const description = descEl?.value.trim() || '';
-            // Always use hidden path input — never use img.src (it becomes absolute URL)
-            const image_url   = pathEl?.value.trim() || 'images/portrait_sample.png';
-
-            if (!title) { errors.push(`Service ${i}: title is required`); continue; }
-            if (!id)    { errors.push(`Service ${i}: not loaded from DB yet — please reload tab`); continue; }
-
-            const res = await fetch(`${CONFIG.API_URL}/admin/services/${id}`, {
+    if (formValue) {
+        try {
+            const res = await fetch(`${CONFIG.API_URL}/admin/services/${service.id}`, {
                 method:  'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify({ title, description, image_url })
+                body:    JSON.stringify(formValue)
             });
-            if (!res.ok) errors.push(`Service ${i}: ${(await res.json().catch(() => ({}))).error || `HTTP ${res.status}`}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            
+            renderServicesEditor();
+            localStorage.setItem('services_updated', Date.now());
+            Swal.fire({ icon: 'success', title: 'Offering Optimized', text: 'Landing page will reflect changes instantly.', confirmButtonColor: '#1A1A1A', timer: 2000 });
+        } catch (err) {
+            Swal.fire({ icon: 'error', title: 'Update Blocked', text: err.message, confirmButtonColor: '#C16053' });
         }
-
-        if (errors.length) {
-            Swal.fire({ icon: 'warning', title: 'Partial Save', html: errors.map(e => `• ${e}`).join('<br>'), confirmButtonColor: '#C16053' });
-        } else {
-            await Swal.fire({ icon: 'success', title: 'Services Updated!', text: 'Changes saved to database and will reflect on the public site.', confirmButtonColor: '#1A1A1A', timer: 2500, timerProgressBar: true });
-            loadServicesToForm(); // Reload to confirm DB values
-        }
-    } catch (err) {
-        console.error('Save Services Error:', err);
-        Swal.fire({ icon: 'error', title: 'Save Failed', text: err.message, confirmButtonColor: '#C16053' });
     }
 };
+
+window.previewServiceImageInModal = (input) => window.previewImageInModal(input, 'se-preview-img', 'se-status');
 
 
 // ── Load Rates to Form (from DB) ─────────────────────────────
@@ -780,6 +829,7 @@ window.saveRates = async () => {
         if (errors.length) {
             Swal.fire({ icon: 'warning', title: 'Partial Save', html: errors.join('<br>'), confirmButtonColor: '#C16053' });
         } else {
+            localStorage.setItem('rates_updated', Date.now());
             Swal.fire({ icon: 'success', title: 'Rates Updated!', confirmButtonColor: '#1A1A1A', timer: 2000, timerProgressBar: true });
         }
     } catch (err) {
@@ -788,24 +838,11 @@ window.saveRates = async () => {
 };
 
 // 9. Change Password Logic
-window.handlePasswordUpdate = (e) => {
+window.handlePasswordUpdate = async (e) => {
     e.preventDefault();
     const current = document.getElementById('current-pass').value;
     const newP = document.getElementById('new-pass').value;
     const confirmP = document.getElementById('confirm-pass').value;
-    
-    // Check against stored password or default
-    const storedPass = localStorage.getItem('admin_pass') || 'admin123';
-
-    if(current !== storedPass) {
-        Swal.fire({
-            icon: 'error',
-            title: 'Incorrect Passkey',
-            text: 'Your current passkey does not match our records.',
-            confirmButtonColor: '#C16053'
-        });
-        return;
-    }
 
     if(newP !== confirmP) {
         Swal.fire({
@@ -827,20 +864,38 @@ window.handlePasswordUpdate = (e) => {
         return;
     }
 
-    // Save New Password
-    localStorage.setItem('admin_pass', newP);
+    try {
+        Swal.fire({ title: 'Updating Credentials...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+        const res = await fetch(`${CONFIG.API_URL}/admin/password`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ currentPassword: current, newPassword: newP })
+        });
 
-    Swal.fire({
-        icon: 'success',
-        title: 'Passkey Updated!',
-        text: 'Your administrative security credentials have been changed successfully.',
-        confirmButtonColor: '#1A1A1A'
-    }).then(() => {
-        // Clear inputs for security
-        document.getElementById('current-pass').value = '';
-        document.getElementById('new-pass').value = '';
-        document.getElementById('confirm-pass').value = '';
-    });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || 'Server rejected changes');
+        }
+
+        Swal.fire({
+            icon: 'success',
+            title: 'Passkey Updated!',
+            text: 'Your administrative security credentials have been securely changed in the database.',
+            confirmButtonColor: '#1A1A1A'
+        }).then(() => {
+            // Clear inputs for security
+            document.getElementById('current-pass').value = '';
+            document.getElementById('new-pass').value = '';
+            document.getElementById('confirm-pass').value = '';
+        });
+    } catch (error) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Update Failed',
+            text: error.message || 'Incorrect current passkey.',
+            confirmButtonColor: '#C16053'
+        });
+    }
 };
 
 // 10. Intelligent Duplicate Cleanup
@@ -892,8 +947,7 @@ window.cleanDuplicates = () => {
     }).then((result) => {
         if (result.isConfirmed) {
             localStorage.setItem('bookings', JSON.stringify(uniqueBookings));
-            renderAdminRequests();
-            if(typeof initStatsCharts === 'function') initStatsCharts(); // Update Charts
+            syncDashboardData();
             
             Swal.fire({
                 icon: 'success',
@@ -1055,83 +1109,107 @@ window.switchTab = (tabId) => {
     });
     if (sidebarBtn) sidebarBtn.classList.add('active-tab');
 
-    // Sync Data
-    if (tabId === 'gallery-tab' && typeof renderGallery === 'function') renderGallery();
-    if (tabId === 'booking-tab' && typeof renderAdminRequests === 'function') {
-        renderAdminRequests();
-        initStatsCharts();
-    }
-    if (tabId === 'services-tab' && typeof loadServicesToForm === 'function') loadServicesToForm();
+    // Sync Data on tab switch
+    // Note: booking-tab, request-tab AND gallery-tab rows are pre-rendered by PHP on page load.
+    // syncDashboardData() / renderGallery() is called manually or after a CRUD action.
+    if (tabId === 'services-tab' && typeof renderServicesEditor === 'function') renderServicesEditor();
     if (tabId === 'rates-tab' && typeof loadRatesToForm === 'function') loadRatesToForm();
 };
 
 let volumeChartInst = null;
 let revenueChartInst = null;
 
-window.initStatsCharts = async () => {
+window.initStatsCharts = (bookings) => {
     const ctxVol = document.getElementById('volumeChart');
     const ctxRev = document.getElementById('revenueChart');
-    if (!ctxVol || !ctxRev) return;
+    if (!ctxVol || !ctxRev || !bookings) return;
 
     if (volumeChartInst) volumeChartInst.destroy();
     if (revenueChartInst) revenueChartInst.destroy();
 
-    try {
-        const response = await fetch(`${CONFIG.API_URL}/admin/bookings`);
-        const bookings = await response.json();
+    const getParsedDate = (dateStr) => {
+        if (!dateStr) return new Date();
+        const d = new Date(dateStr);
+        return isNaN(d.getTime()) ? new Date() : d;
+    };
 
-        const getParsedDate = (dateStr) => {
-            if (!dateStr) return new Date();
-            const d = new Date(dateStr);
-            return isNaN(d.getTime()) ? new Date() : d;
-        };
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const completedVolume = new Array(7).fill(0);
+    bookings.filter(b => b.status === 'completed').forEach(b => {
+        const date = getParsedDate(b.created_at || b.date);
+        completedVolume[date.getDay()]++;
+    });
 
-        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        const completedVolume = new Array(7).fill(0);
-        bookings.filter(b => b.status === 'completed').forEach(b => {
-            const date = getParsedDate(b.created_at || b.date);
-            completedVolume[date.getDay()]++;
-        });
+    const volCtx2d = ctxVol.getContext('2d');
+    const gradient = volCtx2d.createLinearGradient(0, 0, 0, 400);
+    gradient.addColorStop(0, 'rgba(193, 96, 83, 0.5)'); // Pencilation Red fading
+    gradient.addColorStop(1, 'rgba(193, 96, 83, 0)');
 
-        volumeChartInst = new Chart(ctxVol, {
-            type: 'bar',
-            data: {
-                labels: days,
-                datasets: [{ label: 'Completions', data: completedVolume, backgroundColor: '#22c55e' }]
+    volumeChartInst = new Chart(ctxVol, {
+        type: 'line',
+        data: {
+            labels: days,
+            datasets: [{ 
+                label: 'Completions', 
+                data: completedVolume, 
+                borderColor: '#C16053',
+                backgroundColor: gradient,
+                borderWidth: 4,
+                tension: 0, // Sharp lightning effect
+                fill: true,
+                pointBackgroundColor: '#FDFBF7',
+                pointBorderColor: '#C16053',
+                pointBorderWidth: 3,
+                pointRadius: 6,
+                pointHoverRadius: 9
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, grid: { borderDash: [5, 5], color: '#f3f4f6' } },
+                x: { grid: { display: false } }
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    y: { beginAtZero: true, grid: { borderDash: [5, 5], color: '#f3f4f6' } },
-                    x: { grid: { display: false } }
-                }
-            }
-        });
-
-        const pending = bookings.filter(b => b.status === 'pending').length;
-        const accepted = bookings.filter(b => b.status === 'accepted').length;
-
-        revenueChartInst = new Chart(ctxRev, {
-            type: 'bar',
-            data: {
-                labels: ['Pending', 'WIP (Accepted)'],
-                datasets: [{ data: [pending, accepted], backgroundColor: ['#3b82f6', '#1A1A1A'] }]
+            interaction: {
+                intersect: false,
+                mode: 'index',
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    y: { beginAtZero: true, grid: { borderDash: [5, 5], color: '#f3f4f6' } },
-                    x: { grid: { display: false } }
-                }
-            }
-        });
-    } catch (e) {
-        console.error("Charts Sync Error:", e);
-    }
+        }
+    });
+
+    const pending = bookings.filter(b => b.status === 'pending').length;
+    const accepted = bookings.filter(b => b.status === 'accepted').length;
+
+    revenueChartInst = new Chart(ctxRev, {
+        type: 'doughnut',
+        data: {
+            labels: ['Pending', 'WIP (Accepted)'],
+            datasets: [{ 
+                data: [pending, accepted], 
+                backgroundColor: ['#3b82f6', '#C16053'],
+                borderWidth: 0,
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { 
+                legend: { 
+                    display: true,
+                    position: 'bottom',
+                    labels: {
+                        font: { family: 'Outfit', weight: 'bold', size: 10 },
+                        usePointStyle: true,
+                        padding: 20
+                    }
+                } 
+            },
+            cutout: '75%'
+        }
+    });
 };
 
 // Application Bootstrap
@@ -1169,7 +1247,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    if(window.location.pathname.includes('dashboard.html')) {
+    if(window.location.pathname.includes('dashboard.html') || window.location.pathname.includes('dashboard.php')) {
         switchTab('booking-tab');
     }
 });

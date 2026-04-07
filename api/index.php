@@ -4,6 +4,8 @@ header("Content-Type: application/json; charset=UTF-8");
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
 header("Access-Control-Max-Age: 3600");
 header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
+header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Pragma: no-cache");
 
 // Handle CORS preflight
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -50,6 +52,10 @@ if ($resource === 'upload') {
     if ($method === 'POST') {
         require_once __DIR__ . '/controllers/BookingController.php';
         (new BookingController($db))->store($body);
+    } elseif ($method === 'GET' && isset($uriParts[1]) && $uriParts[1] === 'status') {
+        // GET /bookings/status/{email}
+        require_once __DIR__ . '/controllers/BookingController.php';
+        (new BookingController($db))->status($uriParts[2] ?? '');
     } else {
         jsonResponse(['error' => 'Method not allowed'], 405);
     }
@@ -146,8 +152,28 @@ if ($resource === 'upload') {
             jsonResponse(['error' => 'Method not allowed'], 405);
         }
 
+    // --- /admin/password ---
+    } elseif ($subResource === 'password') {
+        require_once __DIR__ . '/controllers/AuthController.php';
+        $ctrl = new AuthController($db);
+        if ($method === 'PUT') {
+            $ctrl->updatePassword($body);
+        } else {
+            jsonResponse(['error' => 'Method not allowed'], 405);
+        }
     } else {
         jsonResponse(['error' => 'Admin resource not found'], 404);
+    }
+
+} elseif ($resource === 'auth') {
+    $subResource = $uriParts[1] ?? '';
+
+    // --- /auth/login ---
+    if ($subResource === 'login' && $method === 'POST') {
+        require_once __DIR__ . '/controllers/AuthController.php';
+        (new AuthController($db))->login($body);
+    } else {
+        jsonResponse(['error' => 'Auth endpoint not found'], 404);
     }
 
 } else {

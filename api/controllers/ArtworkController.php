@@ -20,11 +20,7 @@ class ArtworkController {
             return;
         }
 
-        // Truncate base64 image if it exceeds varchar(500)
         $imageUrl = $data['image_url'] ?? '';
-        if (strlen($imageUrl) > 490) {
-            $imageUrl = substr($imageUrl, 0, 490);
-        }
 
         $sql  = "INSERT INTO artworks (title, category, size, image_url, is_featured) VALUES (:title, :category, :size, :image_url, :is_featured)";
         $stmt = $this->db->prepare($sql);
@@ -56,6 +52,10 @@ class ArtworkController {
             $fields[] = 'size = :size';
             $params[':size'] = $data['size'];
         }
+        if (isset($data['image_url']) && !empty($data['image_url'])) {
+            $fields[] = 'image_url = :image_url';
+            $params[':image_url'] = $data['image_url'];
+        }
 
         if (empty($fields)) {
             jsonResponse(['error' => 'No fields to update'], 422);
@@ -66,11 +66,7 @@ class ArtworkController {
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
 
-        if ($stmt->rowCount() === 0) {
-            jsonResponse(['error' => 'Artwork not found or no change made'], 404);
-            return;
-        }
-
+        // SUCCESS: Identical data is not an error
         jsonResponse(['message' => 'Artwork updated successfully']);
     }
 

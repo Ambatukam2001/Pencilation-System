@@ -45,18 +45,6 @@ function safeImg(src, fallback) {
     return src;
 }
 
-// Build a URL that works whether served from XAMPP or Live Server
-function buildImgUrl(path) {
-    if (!path) return 'images/portrait_sample.png';
-    if (path.startsWith('http') || path.startsWith('data:')) return 'images/portrait_sample.png';
-    // On Live Server (port 5500/5501), images are served by XAMPP at localhost
-    const port = window.location.port;
-    if (port === '5500' || port === '5501') {
-        return `http://localhost/Portrait Drawing/${path}`;
-    }
-    return path; // Relative path works fine on XAMPP directly
-}
-
 // ── 1. Gallery Renderer ──────────────────────────────────────
 window.renderGallery = async () => {
     const galleryContainer = document.getElementById('gallery-container');
@@ -100,8 +88,8 @@ window.renderServices = async () => {
                          onerror="this.src='images/portrait_sample.png'"
                          class="w-full h-full object-cover opacity-80 group-hover:scale-110 transition-all duration-700">
                 </div>
-                <h3 class="text-lg font-black uppercase tracking-[0.2em] mb-4 text-[#1A1A1A] pt-4">${s.title}</h3>
-                <p class="opacity-60 text-[11px] leading-relaxed line-clamp-3">${s.description || s.desc || ''}</p>
+                <h3 class="text-xl font-bold uppercase tracking-normal mb-8 text-[#1A1A1A] pt-4 leading-[1.8] break-all">${s.title}</h3>
+                <p class="opacity-60 text-xs leading-[1.8] line-clamp-3 overflow-hidden text-ellipsis">${s.description || s.desc || ''}</p>
             </div>`;
         }).join('');
     }
@@ -172,7 +160,19 @@ window.scrollGallery = (dir) => {
 
 // ── Bootstrap ────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+    // Initial renders
     renderGallery();
     renderServices();
     renderRates();
+
+    // Cross-tab real-time sync wrapper
+    window.addEventListener('storage', (e) => {
+        if (e.key === 'gallery_updated') {
+            renderGallery();
+        } else if (e.key === 'services_updated') {
+            renderServices();
+        } else if (e.key === 'rates_updated') {
+            renderRates();
+        }
+    });
 });

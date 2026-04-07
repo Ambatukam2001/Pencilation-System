@@ -22,13 +22,9 @@ class Database {
             $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             $this->conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
         } catch(PDOException $exception) {
-            try {
-                $this->conn = new PDO("mysql:host=" . $this->host, $this->username, $this->password);
-                $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-            } catch(PDOException $ex) {
-                echo json_encode(["error" => "Database Connection Failed: " . $exception->getMessage()]);
-                exit;
-            }
+            // ERROR: Database name or connection is invalid. Stop and report.
+            echo json_encode(["status" => "error", "error" => "Database Connection Failed: " . $exception->getMessage()]);
+            exit;
         }
         return $this->conn;
     }

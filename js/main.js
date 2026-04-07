@@ -17,19 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // ── 2. Sticky Navbar ────────────────────────────────────
-    const mainNav = document.getElementById('main-nav');
-    if (mainNav) {
-        window.addEventListener('scroll', () => {
-            if (window.scrollY > 50) {
-                mainNav.classList.remove('bg-transparent', 'py-6', 'border-none');
-                mainNav.classList.add('bg-white', 'py-4', 'border-b', 'border-gray-100', 'shadow-sm');
-            } else {
-                mainNav.classList.add('bg-transparent', 'py-6', 'border-none');
-                mainNav.classList.remove('bg-white', 'py-4', 'border-b', 'border-gray-100', 'shadow-sm');
-            }
-        });
-    }
+    // ── 2. Sticky Navbar (Removed to allow absolute scrolling) ────────────────
 
     // ── 3. Mobile Menu Toggle ───────────────────────────────
     const mobileToggle = document.getElementById('mobile-toggle');
@@ -61,14 +49,45 @@ document.addEventListener('DOMContentLoaded', () => {
         }, { passive: true });
     }
 
-    // ── 5. Live Session Badge (from localStorage) ───────────
-    const liveBadge    = document.getElementById('artist-live-badge');
-    const liveLink     = document.getElementById('live-session-link');
-    const isArtistLive = localStorage.getItem('is_live_session') === 'true';
-    const liveUrl      = localStorage.getItem('live_meeting_url');
+    // ── 5. Live Artist Session Badge ────────────────────────
+    function checkLiveStatus() {
+        const liveBadge    = document.getElementById('artist-live-badge');
+        const liveLink     = document.getElementById('live-session-link');
+        const isArtistLive = localStorage.getItem('is_live_session') === 'true';
+        const liveUrl      = localStorage.getItem('live_meeting_url');
 
-    if (liveBadge && isArtistLive) {
-        liveBadge.classList.replace('hidden', 'flex');
-        if (liveLink && liveUrl) liveLink.href = liveUrl;
+        if (liveBadge && isArtistLive) {
+            liveBadge.classList.replace('hidden', 'flex');
+            if (liveLink && liveUrl) liveLink.href = liveUrl;
+        }
     }
+
+    // ── 6. Live Booking Notification ──────────────────────────
+    async function checkBookingNotification() {
+        const lastEmail = localStorage.getItem('last_booking_email');
+        if (!lastEmail) return;
+
+        const noticeEl = document.getElementById('user-meetup-notice');
+        const nameEl   = document.getElementById('user-meetup-name');
+        if (!noticeEl) return;
+
+        try {
+            const res  = await fetch(`${CONFIG.API_URL}/bookings/status/${lastEmail}`);
+            if (!res.ok) return;
+            const data = await res.json();
+
+            if (data && data.status === 'accepted') {
+                noticeEl.classList.remove('hidden');
+                noticeEl.classList.add('flex');
+                if (nameEl) nameEl.textContent = data.address || 'Standard Location Spot';
+                lucide.createIcons();
+            }
+        } catch (e) {
+            console.warn('Booking status check failed:', e);
+        }
+    }
+
+    // Initialize all status components
+    checkLiveStatus();
+    checkBookingNotification();
 });
