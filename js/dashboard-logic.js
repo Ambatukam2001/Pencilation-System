@@ -582,142 +582,104 @@ window.addArtworkModal = () => {
     });
 };
 
-// 7. Services Management Logic
-window.previewServiceImage = (id) => {
-    const file = document.getElementById(`service-${id}-file`).files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const previewEl = document.getElementById(`service-${id}-preview`);
-            if(previewEl) previewEl.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
-    }
-};
 
-window.saveServices = async () => {
-    try {
-        const getBase64 = (file) => {
-            return new Promise((resolve, reject) => {
-                if(!file) resolve(null);
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result);
-                reader.onerror = reject;
-                reader.readAsDataURL(file);
-            });
-        };
-
-        Swal.fire({
-            title: 'Updating Services...',
-            text: 'Synchronizing your artistic categories...',
-            allowOutsideClick: false,
-            didOpen: () => { Swal.showLoading(); }
-        });
-
-        const currentServices = JSON.parse(localStorage.getItem('services_data')) || [];
-        const services = [];
-        
-        for(let i=1; i<=3; i++) {
-            const fileInput = document.getElementById(`service-${i}-file`);
-            const titleInput = document.getElementById(`service-${i}-title`);
-            const descInput = document.getElementById(`service-${i}-desc`);
-            
-            if(!titleInput || !descInput) continue;
-
-            const title = titleInput.value;
-            const desc = descInput.value;
-            
-            let img = currentServices.find(s => s.id === i)?.img || "";
-            
-            if(!img) {
-                const defaultMap = { 1: 'images/portrait_sample.png', 2: 'images/digital_art.png', 3: 'images/colored.jpg' };
-                img = defaultMap[i];
-            }
-
-            if(fileInput && fileInput.files[0]) {
-                const b64 = await getBase64(fileInput.files[0]);
-                if(b64) img = b64;
-            }
-            
-            services.push({ id: i, title, desc, img });
-        }
-
-        localStorage.setItem('services_data', JSON.stringify(services));
-
-        await Swal.fire({
-            icon: 'success',
-            title: 'Sync Complete!',
-            text: 'Your landing page highlights have been updated successfully.',
-            confirmButtonColor: '#1A1A1A',
-            timer: 2000,
-            timerProgressBar: true
-        });
-
-        if(typeof loadServicesToForm === 'function') loadServicesToForm();
-
-    } catch (error) {
-        console.error("Save Error:", error);
-        Swal.fire({
-            icon: 'error',
-            title: 'Update Failed',
-            text: error.name === 'QuotaExceededError' 
-                ? 'Your images are too large for browser storage. Please try smaller files.' 
-                : 'An unexpected error occurred while saving.',
-            confirmButtonColor: '#C16053'
-        });
-    }
-};
-
-// ── Load Services into Form (from DB) ─────────────────────────
+// ── Load Services into Form (from DB) ────────────────────────
 window.loadServicesToForm = async () => {
-    const defaultServices = [
-        { id: 1, title: 'Pencil Realism Art',  description: '"BINI Mikha" - Hyper-realistic pencil portrait capturing every fine detail.',            image_url: 'images/portrait_sample.png' },
-        { id: 2, title: 'Digital Drawing Art', description: '"ASEAN Diversity" - Vibrant digital commission celebrating Southeast Asian unity.', image_url: 'images/digital_art.png'     },
-        { id: 3, title: 'Colored Drawing Art', description: '"Evil Demon Slayer" - Triple-panel illustration with colored pencils and markers.',     image_url: 'images/colored.jpg'         }
+    const DEFAULTS = [
+        { id: 1, title: 'Pencil Realism Art',  description: '"BINI Mikha" - Hyper-realistic pencil portrait, meticulously crafted to capture every detail.',   image_url: 'images/portrait_sample.png' },
+        { id: 2, title: 'Digital Drawing Art', description: '"ASEAN Diversity" - Vibrant digital commission celebrating Southeast Asian unity and culture.',     image_url: 'images/digital_art.png'     },
+        { id: 3, title: 'Colored Drawing Art', description: '"Evil Demon Slayer" - Triple-panel illustration with vibrant colored pencils and bold calligraphy.', image_url: 'images/colored.jpg'         }
     ];
+
+    const applyService = (service, i) => {
+        const titleEl   = document.getElementById(`service-${i}-title`);
+        const descEl    = document.getElementById(`service-${i}-desc`);
+        const previewEl = document.getElementById(`service-${i}-preview`);
+        const pathEl    = document.getElementById(`service-${i}-path`); // hidden input
+
+        // Detect bad image_url (absolute URL or base64) and reset to default
+        const rawUrl   = service.image_url || '';
+        const isAbsUrl = rawUrl.startsWith('http') || rawUrl.startsWith('data:');
+        const imgPath  = isAbsUrl
+            ? (DEFAULTS[i - 1]?.image_url || 'images/portrait_sample.png')
+            : (rawUrl || DEFAULTS[i - 1]?.image_url || 'images/portrait_sample.png');
+
+        if (titleEl)   { titleEl.value     = service.title || '';       titleEl.dataset.dbId = service.id; }
+        if (descEl)      descEl.value      = service.description || '';
+        if (previewEl)   previewEl.src     = imgPath;
+        if (pathEl)      pathEl.value      = imgPath;  // always relative path
+    };
 
     try {
         const res = await fetch(`${CONFIG.API_URL}/admin/services`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const services = await res.json();
-        const data = services.length ? services : defaultServices;
-
-        data.forEach((service, index) => {
-            const i         = index + 1;
-            const titleEl   = document.getElementById(`service-${i}-title`);
-            const descEl    = document.getElementById(`service-${i}-desc`);
-            const previewEl = document.getElementById(`service-${i}-preview`);
-
-            if (titleEl)   { titleEl.value        = service.title || '';       titleEl.dataset.dbId = service.id; }
-            if (descEl)    { descEl.value         = service.description || ''; }
-            if (previewEl) { previewEl.src         = service.image_url || 'images/portrait_sample.png'; previewEl.dataset.src = service.image_url || ''; }
-        });
+        const data = (services && services.length) ? services : DEFAULTS;
+        data.forEach((s, idx) => applyService(s, idx + 1));
     } catch (err) {
         console.error('Load Services Error:', err);
-        // Fall back to defaults silently
-        defaultServices.forEach((s, index) => {
-            const i = index + 1;
-            const t = document.getElementById(`service-${i}-title`);
-            const d = document.getElementById(`service-${i}-desc`);
-            const p = document.getElementById(`service-${i}-preview`);
-            if (t) { t.value = s.title;       t.dataset.dbId = s.id; }
-            if (d)   d.value = s.description;
-            if (p) { p.src   = s.image_url;   p.dataset.src  = s.image_url; }
-        });
+        DEFAULTS.forEach((s, idx) => applyService(s, idx + 1));
     }
 };
 
-// ── Preview service image (local file picker) ──────────────────
+// ── Preview service image — updates hidden path, not img.src only ──
 window.previewServiceImage = (i) => {
-    const file = document.getElementById(`service-${i}-file`)?.files[0];
+    const fileInput = document.getElementById(`service-${i}-file`);
+    const previewEl = document.getElementById(`service-${i}-preview`);
+    const pathEl    = document.getElementById(`service-${i}-path`);
+    const file      = fileInput?.files[0];
     if (!file) return;
-    const reader    = new FileReader();
-    reader.onload   = (e) => {
-        const preview = document.getElementById(`service-${i}-preview`);
-        if (preview) preview.src = e.target.result;
-    };
+
+    // Show local preview via FileReader (base64 is fine for display only)
+    const reader  = new FileReader();
+    reader.onload = (e) => { if (previewEl) previewEl.src = e.target.result; };
     reader.readAsDataURL(file);
+
+    // Store the filename as a relative path in the hidden input
+    // (The server already serves images from /images/ — admin should upload to that folder)
+    if (pathEl) pathEl.value = `images/${file.name}`;
 };
+
+// ── Save Services to DB ───────────────────────────────────────
+window.saveServices = async () => {
+    Swal.fire({ title: 'Saving Services…', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    try {
+        const errors = [];
+        for (let i = 1; i <= 3; i++) {
+            const titleEl = document.getElementById(`service-${i}-title`);
+            const descEl  = document.getElementById(`service-${i}-desc`);
+            const pathEl  = document.getElementById(`service-${i}-path`);
+            if (!titleEl) continue;
+
+            const id          = titleEl.dataset.dbId;
+            const title       = titleEl.value.trim();
+            const description = descEl?.value.trim() || '';
+            // Always use hidden path input — never use img.src (it becomes absolute URL)
+            const image_url   = pathEl?.value.trim() || 'images/portrait_sample.png';
+
+            if (!title) { errors.push(`Service ${i}: title is required`); continue; }
+            if (!id)    { errors.push(`Service ${i}: not loaded from DB yet — please reload tab`); continue; }
+
+            const res = await fetch(`${CONFIG.API_URL}/admin/services/${id}`, {
+                method:  'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ title, description, image_url })
+            });
+            if (!res.ok) errors.push(`Service ${i}: ${(await res.json().catch(() => ({}))).error || `HTTP ${res.status}`}`);
+        }
+
+        if (errors.length) {
+            Swal.fire({ icon: 'warning', title: 'Partial Save', html: errors.map(e => `• ${e}`).join('<br>'), confirmButtonColor: '#C16053' });
+        } else {
+            await Swal.fire({ icon: 'success', title: 'Services Updated!', text: 'Changes saved to database and will reflect on the public site.', confirmButtonColor: '#1A1A1A', timer: 2500, timerProgressBar: true });
+            loadServicesToForm(); // Reload to confirm DB values
+        }
+    } catch (err) {
+        console.error('Save Services Error:', err);
+        Swal.fire({ icon: 'error', title: 'Save Failed', text: err.message, confirmButtonColor: '#C16053' });
+    }
+};
+
 
 // ── Load Rates to Form (from DB) ─────────────────────────────
 window.loadRatesToForm = async () => {
