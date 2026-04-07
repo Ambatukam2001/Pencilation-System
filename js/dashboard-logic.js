@@ -512,27 +512,31 @@ window.editImage = (btn) => {
     });
 };
 
-// 7. Add Artwork Modal (API Synchronized)
+// 7. Add Artwork Modal — uploads image first, then saves path to DB
 window.addArtworkModal = () => {
     Swal.fire({
         title: 'New Gallery Addition',
         html: `
             <style>
-                .swal2-input, .swal2-file { color: #1A1A1A !important; font-family: 'Outfit', sans-serif; font-size: 13px; margin: 8px auto; border-radius: 12px; border: 1px solid #eee; width: 100%; box-sizing: border-box; }
-                .swal-label { font-size: 9px; font-weight: 900; text-transform: uppercase; color: #C16053; display: block; text-align: left; margin-top: 10px; tracking: 1px; }
+                .swal2-input { color: #1A1A1A !important; font-family: 'Outfit', sans-serif; font-size: 13px; margin: 8px auto; border-radius: 12px; border: 1px solid #eee; width: 100%; box-sizing: border-box; }
+                .swal-label  { font-size: 9px; font-weight: 900; text-transform: uppercase; color: #C16053; display: block; text-align: left; margin-top: 10px; }
             </style>
             <div class="text-left px-4">
                 <label class="swal-label">Artwork Title</label>
                 <input id="add-title" class="swal2-input" placeholder="e.g. The Soulful Stroke">
-                
+
                 <label class="swal-label">Media Category</label>
                 <input id="add-category" class="swal2-input" placeholder="e.g. Charcoal on Vellum">
-                
+
                 <label class="swal-label">Standard Size</label>
                 <input id="add-size" class="swal2-input" placeholder="e.g. 12x18 inches">
-                
+
                 <label class="swal-label">Upload Artwork Image</label>
-                <input type="file" id="add-img-file" class="swal2-file p-3 cursor-pointer" accept="image/*">
+                <input type="file" id="add-img-file" class="swal2-input p-3 cursor-pointer" accept="image/*" onchange="previewAddArtwork(this)">
+                <div id="add-img-preview-wrap" class="mt-3 hidden">
+                    <img id="add-img-preview" class="w-full h-40 object-cover rounded-xl border border-gray-100" alt="Preview">
+                    <p id="add-upload-status" class="text-[9px] text-yellow-600 font-bold mt-1">Ready to upload</p>
+                </div>
             </div>
         `,
         focusConfirm: false,
@@ -540,47 +544,69 @@ window.addArtworkModal = () => {
         confirmButtonText: 'Publish to Gallery',
         showCancelButton: true,
         cancelButtonText: 'Discard',
-        preConfirm: () => {
-             const title = document.getElementById('add-title').value;
-             const category = document.getElementById('add-category').value;
-             const size = document.getElementById('add-size').value;
-             const fileInput = document.getElementById('add-img-file');
+        preConfirm: async () => {
+            const title    = document.getElementById('add-title').value.trim();
+            const category = document.getElementById('add-category').value.trim();
+            const size     = document.getElementById('add-size').value.trim();
+            const fileInput = document.getElementById('add-img-file');
 
-             if(!title || !category || !fileInput.files.length) {
-                 Swal.showValidationMessage('Please fill in Required fields (Title, Category, Image File)');
-                 return false;
-             }
+            if (!title || !category) {
+                Swal.showValidationMessage('Title and Category are required');
+                return false;
+            }
+            if (!fileInput.files.length) {
+                Swal.showValidationMessage('Please select an image file');
+                return false;
+            }
 
-             return new Promise((resolve) => {
-                 const reader = new FileReader();
-                 reader.onload = (e) => resolve({ title, category, size, image_url: e.target.result });
-                 reader.readAsDataURL(fileInput.files[0]);
-             });
+            // Upload image to server
+            const statusEl = document.getElementById('add-upload-status');
+            try {
+                if (statusEl) statusEl.textContent = 'Uploading image…';
+                const formData = new FormData();
+                formData.append('file', fileInput.files[0]);
+                const upRes = await fetch(`${CONFIG.API_URL}/upload`, { method: 'POST', body: formData });
+                if (!upRes.ok) {
+                    const e = await upRes.json().catch(() => ({}));
+                    Swal.showValidationMessage('Upload failed: ' + (e.error || `HTTP ${upRes.status}`));
+                    return false;
+                }
+                const upData = await upRes.json();
+                if (statusEl) statusEl.textContent = '✓ Uploaded: ' + upData.filename;
+                return { title, category, size, image_url: upData.path };
+            } catch (e) {
+                Swal.showValidationMessage('Upload error: ' + e.message);
+                return false;
+            }
         }
     }).then(async (result) => {
-        if (result.isConfirmed) {
-            try {
-                const response = await fetch(`${CONFIG.API_URL}/admin/artworks`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(result.value)
-                });
-                if(!response.ok) throw new Error('Publish Failed');
-
-                renderGallery(); // Re-render everything
-
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Artwork Published!',
-                    text: 'Your new masterpiece is now live on the public gallery.',
-                    confirmButtonColor: '#1A1A1A'
-                });
-            } catch (error) {
-                console.error("Publish Error:", error);
-            }
+        if (!result.isConfirmed || !result.value) return;
+        try {
+            const res = await fetch(`${CONFIG.API_URL}/admin/artworks`, {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify(result.value)
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            await renderGallery();
+            Swal.fire({ icon: 'success', title: 'Artwork Published!', text: 'Your new masterpiece is now live in the gallery.', confirmButtonColor: '#1A1A1A' });
+        } catch (err) {
+            Swal.fire({ icon: 'error', title: 'Publish Failed', text: err.message, confirmButtonColor: '#C16053' });
         }
     });
 };
+
+// Live preview inside artwork modal
+window.previewAddArtwork = (input) => {
+    const wrap = document.getElementById('add-img-preview-wrap');
+    const img  = document.getElementById('add-img-preview');
+    if (!input.files[0] || !wrap || !img) return;
+    wrap.classList.remove('hidden');
+    const reader = new FileReader();
+    reader.onload = (e) => { img.src = e.target.result; };
+    reader.readAsDataURL(input.files[0]);
+};
+
 
 
 // ── Load Services into Form (from DB) ────────────────────────
@@ -622,22 +648,41 @@ window.loadServicesToForm = async () => {
     }
 };
 
-// ── Preview service image — updates hidden path, not img.src only ──
-window.previewServiceImage = (i) => {
+// ── Upload file to server, get back relative path ──────────
+async function uploadImageFile(file, statusEl) {
+    if (statusEl) { statusEl.textContent = 'Uploading…'; statusEl.className = 'text-[9px] text-yellow-600 font-bold mt-1'; }
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch(`${CONFIG.API_URL}/upload`, { method: 'POST', body: formData });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Upload failed (HTTP ${res.status})`);
+    }
+    return await res.json(); // { path, filename, size, type }
+}
+
+// ── Service image: upload on file select ─────────────────────
+window.previewServiceImage = async (i) => {
     const fileInput = document.getElementById(`service-${i}-file`);
     const previewEl = document.getElementById(`service-${i}-preview`);
     const pathEl    = document.getElementById(`service-${i}-path`);
+    const statusEl  = document.getElementById(`service-${i}-status`);
     const file      = fileInput?.files[0];
     if (!file) return;
 
-    // Show local preview via FileReader (base64 is fine for display only)
+    // Immediate local preview
     const reader  = new FileReader();
     reader.onload = (e) => { if (previewEl) previewEl.src = e.target.result; };
     reader.readAsDataURL(file);
 
-    // Store the filename as a relative path in the hidden input
-    // (The server already serves images from /images/ — admin should upload to that folder)
-    if (pathEl) pathEl.value = `images/${file.name}`;
+    try {
+        const data = await uploadImageFile(file, statusEl);
+        if (pathEl) pathEl.value = data.path; // e.g. "images/portrait_abc123.jpg"
+        if (statusEl) { statusEl.textContent = '✓ Uploaded: ' + data.filename; statusEl.className = 'text-[9px] text-green-600 font-bold mt-1'; }
+    } catch (err) {
+        if (statusEl) { statusEl.textContent = '✗ ' + err.message; statusEl.className = 'text-[9px] text-red-500 font-bold mt-1'; }
+        Swal.fire({ icon: 'error', title: 'Upload Failed', text: err.message, confirmButtonColor: '#C16053' });
+    }
 };
 
 // ── Save Services to DB ───────────────────────────────────────

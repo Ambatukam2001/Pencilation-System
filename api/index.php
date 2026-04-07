@@ -36,7 +36,16 @@ function jsonResponse($data, $status = 200) {
 // --- Router ---
 $resource = $uriParts[0] ?? '';
 
-if ($resource === 'bookings') {
+if ($resource === 'upload') {
+    // POST /upload — File upload handler (multipart/form-data)
+    if ($method === 'POST') {
+        // Delegate to dedicated upload handler (needs $_FILES access)
+        require_once __DIR__ . '/upload.php';
+    } else {
+        jsonResponse(['error' => 'Method not allowed'], 405);
+    }
+
+} elseif ($resource === 'bookings') {
     // POST /bookings — Public booking submission
     if ($method === 'POST') {
         require_once __DIR__ . '/controllers/BookingController.php';
