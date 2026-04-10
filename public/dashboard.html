@@ -79,7 +79,15 @@
             border-radius: 0 !important;
         }
 
+        #sidebar-toggle {
+            display: none !important;
+        }
+
         @media (max-width: 1023px) {
+            #sidebar-toggle {
+                display: flex !important;
+            }
+
             #sidebar {
                 transform: translateX(-100%) !important;
             }
@@ -94,7 +102,7 @@
 
     <!-- Mobile Sidebar Toggle -->
     <button id="sidebar-toggle" style="z-index: 9999;"
-        class="fixed bottom-8 right-8 w-14 h-14 bg-[#C16053] text-white flex items-center justify-center rounded-full shadow-2xl lg:hidden active:scale-95 transition-all">
+        class="fixed bottom-8 right-8 w-14 h-14 bg-[#C16053] text-white items-center justify-center rounded-full shadow-2xl active:scale-95 transition-all">
         <i data-lucide="menu" class="w-6 h-6"></i>
     </button>
 
