@@ -222,7 +222,14 @@
             // Supabase Auth (secure)
             const email = window.PencilationDB.adminEmailFromUsername(uname);
             const { data, error } = await sb().auth.signInWithPassword({ email, password: pass });
-            if (error) throw error;
+            if (error) {
+                const hint =
+                    ' Use your admin username (not an email). Password must match the user in Supabase → Authentication (email is username@' +
+                    ((typeof CONFIG !== 'undefined' && CONFIG.LOGIN_EMAIL_DOMAIN) || 'pencilation.admin') +
+                    ').';
+                const msg = (error.message || 'Invalid credentials.') + hint;
+                throw new Error(msg);
+            }
             return {
                 username: uname,
                 role: 'admin',

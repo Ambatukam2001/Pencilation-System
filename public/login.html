@@ -4,12 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="supabase-url" content="">
-    <meta name="supabase-anon-key" content="">
+    <meta name="https://kghxzdzhpjqmrxyjoepq.supabase.co" content="https://kghxzdzhpjqmrxyjoepq.supabase.co">
+    <meta name="sb_publishable_ql0R1sAmizZ2I7mbcRoxJw_By9OhiJ5" content="">
     <meta name="login-email-domain" content="pencilation.admin">
     <title>Login | Portrait Drawing System</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100;300;400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/public-pages.css">
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <!-- Lucide Icons -->
@@ -103,19 +103,23 @@
                 <div class="mb-12">
                     <h3 class="text-4xl font-black mb-2 font-display">ADMIN PORTAL</h3>
                     <p class="text-gray-400 font-medium">Authorized artist access only.</p>
+                    <p class="text-gray-500 text-xs mt-4 leading-relaxed max-w-md">
+                        Sign in with your <strong>admin username</strong> (for example <code class="text-[#C16053]">admin</code>) and the
+                        <strong>password from Supabase Authentication</strong>. The app signs you in as
+                        <code class="text-[#1A1A1A]">username@pencilation.admin</code> — you do not type the email.
+                    </p>
                 </div>
 
                 <form id="login-form" class="space-y-10">
                     <div class="space-y-2">
                         <label
-                            class="text-[10px] uppercase tracking-widest font-black text-gray-400 font-bold italic">Admin
-                            Username</label>
+                            class="text-[10px] uppercase tracking-widest font-black text-gray-400 font-bold italic">Admin username (not email)</label>
                         <div class="relative group">
                             <i data-lucide="user"
                                 class="absolute left-0 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-300 group-focus-within:text-[#C16053] transition-colors"></i>
                             <input type="text" id="login-username" required
                                 class="w-full bg-transparent border-b border-gray-100 py-4 pl-10 focus:border-[#C16053] outline-none transition-all font-bold text-sm tracking-widest placeholder:text-gray-200"
-                                placeholder="Admin Name">
+                                placeholder="e.g. admin">
                         </div>
                     </div>
                     <div class="space-y-2">
