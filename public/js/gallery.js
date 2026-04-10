@@ -34,13 +34,7 @@ async function fetchAPI(endpoint) {
     }
 }
 
-function safeImg(src, fallback) {
-    if (!src || src.startsWith('data:')) return fallback || 'images/portrait_sample.png';
-    // If already absolute URL, return as-is
-    if (src.startsWith('http')) return src;
-    // Relative path — prepend base for Live Server compatibility
-    return src;
-}
+// No safeImg needed, using global buildImgUrl from config.js
 
 // ── 1. Gallery Renderer ──────────────────────────────────────
 window.renderGallery = async () => {
@@ -69,7 +63,7 @@ window.renderGallery = async () => {
 
         galleryContainer.innerHTML = artworks.map(art => `
             <div class="portrait-card" onclick="viewImage(this)">
-                <img src="${safeImg(art.image_url || art.img, 'images/portrait_sample.png')}"
+                <img src="${buildImgUrl(art.image_url || art.img)}"
                      alt="${art.title}"
                      onerror="this.src='images/portrait_sample.png'">
                 <div class="overlay-info">
