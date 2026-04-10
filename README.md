@@ -7,75 +7,13 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
-Pencilation Commission Booking System
+<h1> Pencilation Commission Booking System </h1>
 Client Booking & Commission Management Platform/ Supabase Backend (No npm)
+___________________________________________________________________________________________________________________________________
+<p This project is a Pencilation Commission Booking System designed for managing client bookings for custom pencil artwork commissions. It allows users to submit booking requests, view available services, and track their requests through a structured and user-friendly interface.>
 
-This system runs as **static HTML + Tailwind CSS + JavaScript** in `public/` and uses **Supabase** as the backend (no PHP/MySQL API).
+<p The system is built using HTML, Tailwind CSS, and JavaScript for the frontend, ensuring a modern, responsive, and visually appealing design. It features a clean UI with smooth interactions, optimized layout, and mobile-friendly responsiveness to enhance user experience.>
 
-### Supabase URL + anon key
+<p The backend is powered by Laravel, providing a secure and scalable API layer, while Supabase is integrated as the database solution for efficient data storage, management, and real-time synchronization. >
 
-Edit these files:
-
-- `public/index.html`
-- `public/portfolio.html`
-- `public/login.html`
-- `public/dashboard.html`
-
-Fill these meta tags:
-
-```html
-<meta name="supabase-url" content="https://YOUR_PROJECT_ID.supabase.co">
-<meta name="supabase-anon-key" content="YOUR_ANON_PUBLIC_KEY">
-```
-
-They are read by `public/js/supabase.js` to initialize `window.supabaseClient`.
-
-### Admin user (Login + Change Password)
-
-#### Create the admin account
-
-This project **does not auto-create** an admin user in SQL.
-
-1. Go to **Supabase Dashboard → Authentication → Users → Add user**
-2. Create a user:
-   - **Email**: `<username>@<login-email-domain>`
-   - **Password**: your admin password
-
-Default domain (set in page meta tags):
-
-```html
-<meta name="login-email-domain" content="pencilation.admin">
-```
-
-Example:
-
-- Username typed in login form: `adel`
-- Supabase Auth email to create: `adel@pencilation.admin`
-
-#### How login works
-
-The login form still uses **username + password**, but the code converts username → email and signs in with Supabase Auth:
-
-- `public/js/pencilation-db.js` → `adminEmailFromUsername()` and `login()`
-- `supabase.auth.signInWithPassword({ email, password })`
-
-#### Change Password (Dashboard → Security tab)
-
-The “Change Password” UI calls:
-
-- `public/js/dashboard-logic.js` → `handlePasswordUpdate()`
-- which calls `PencilationDB.updateAdminPassword(currentPassword, newPassword)`
-
-What it does:
-
-- **Re-authenticates** using the current password (with your session email)
-- Updates password via `supabase.auth.updateUser({ password })`
-
-### Database schema
-
-Run `supabase/schema.sql` in Supabase SQL Editor.
-
-Notes:
-
-- `bookings.status` defaults to **`pending`**
-- Row Level Security is **disabled** in the SQL for quick setup (as requested)
+<p This platform streamlines the process of handling art commission requests, improving workflow between clients and the artist through a centralized, organized, and aesthetically designed booking system. >
