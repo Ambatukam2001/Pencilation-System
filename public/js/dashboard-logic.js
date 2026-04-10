@@ -390,6 +390,44 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (typeof syncDashboardData === 'function') syncDashboardData();
         });
     }
+
+    // --- Application Bootstrap & Navigation (Consolidated) ---
+    lucide.createIcons();
+    const sideToggle = document.getElementById('sidebar-toggle');
+    const sidebar = document.getElementById('sidebar');
+
+    if (sideToggle && sidebar) {
+        sideToggle.addEventListener('click', () => {
+            const currentTransform = sidebar.style.transform || '';
+            const isClosed = !currentTransform || currentTransform.includes('-100%');
+            
+            if (isClosed) {
+                sidebar.style.transform = 'translateX(0px)';
+                sideToggle.innerHTML = '<i data-lucide="x" class="w-6 h-6"></i>';
+            } else {
+                sidebar.style.transform = 'translateX(-100%)';
+                sideToggle.innerHTML = '<i data-lucide="menu" class="w-6 h-6"></i>';
+            }
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        });
+    }
+
+    window.addEventListener('resize', () => {
+        if (sidebar && sideToggle) {
+            if (window.innerWidth >= 1024) {
+                sidebar.style.transform = 'translateX(0px)';
+                sideToggle.innerHTML = '<i data-lucide="menu" class="w-6 h-6"></i>';
+            } else {
+                sidebar.style.transform = 'translateX(-100%)';
+                sideToggle.innerHTML = '<i data-lucide="menu" class="w-6 h-6"></i>';
+            }
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+    });
+
+    if(window.location.pathname.includes('dashboard.html') || window.location.pathname.includes('dashboard.php')) {
+        switchTab('booking-tab');
+    }
 });
 
 // ── Admin Gallery Renderer ───────────────────────────────────
@@ -1169,43 +1207,5 @@ window.initStatsCharts = (bookings) => {
     });
 };
 
-// Application Bootstrap
-document.addEventListener('DOMContentLoaded', () => {
-    lucide.createIcons();
-    
-    // Core Navigation logic
-    const sideToggle = document.getElementById('sidebar-toggle');
-    const sidebar = document.getElementById('sidebar');
 
-    if (sideToggle && sidebar) {
-        sideToggle.addEventListener('click', () => {
-            const isClosed = sidebar.style.transform === 'translateX(-100%)' || !sidebar.style.transform;
-            if (isClosed) {
-                sidebar.style.transform = 'translateX(0px)';
-                sideToggle.innerHTML = '<i data-lucide="x" class="w-6 h-6"></i>';
-            } else {
-                sidebar.style.transform = 'translateX(-100%)';
-                sideToggle.innerHTML = '<i data-lucide="menu" class="w-6 h-6"></i>';
-            }
-            lucide.createIcons();
-        });
-    }
-
-    window.addEventListener('resize', () => {
-        if (sidebar && sideToggle) {
-            if (window.innerWidth >= 1024) {
-                sidebar.style.transform = 'translateX(0px)';
-                sideToggle.innerHTML = '<i data-lucide="menu" class="w-6 h-6"></i>';
-            } else {
-                sidebar.style.transform = 'translateX(-100%)';
-                sideToggle.innerHTML = '<i data-lucide="menu" class="w-6 h-6"></i>';
-            }
-            lucide.createIcons();
-        }
-    });
-
-    if(window.location.pathname.includes('dashboard.html') || window.location.pathname.includes('dashboard.php')) {
-        switchTab('booking-tab');
-    }
-});
 
