@@ -398,14 +398,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (sideToggle && sidebar) {
         sideToggle.addEventListener('click', () => {
-            const currentTransform = sidebar.style.transform || '';
-            const isClosed = !currentTransform || currentTransform.includes('-100%');
+            const isOpen = sidebar.classList.toggle('active-sidebar');
             
-            if (isClosed) {
-                sidebar.style.transform = 'translateX(0px)';
+            if (isOpen) {
                 sideToggle.innerHTML = '<i data-lucide="x" class="w-6 h-6"></i>';
             } else {
-                sidebar.style.transform = 'translateX(-100%)';
                 sideToggle.innerHTML = '<i data-lucide="menu" class="w-6 h-6"></i>';
             }
             if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -415,10 +412,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.addEventListener('resize', () => {
         if (sidebar && sideToggle) {
             if (window.innerWidth >= 1024) {
-                sidebar.style.transform = 'translateX(0px)';
-                sideToggle.innerHTML = '<i data-lucide="menu" class="w-6 h-6"></i>';
-            } else {
-                sidebar.style.transform = 'translateX(-100%)';
+                sidebar.classList.remove('active-sidebar');
                 sideToggle.innerHTML = '<i data-lucide="menu" class="w-6 h-6"></i>';
             }
             if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -1061,9 +1055,9 @@ window.switchTab = (tabId) => {
 
     // Close sidebar on mobile
     if (window.innerWidth < 1024 && sidebar) {
-        sidebar.style.transform = 'translateX(-100%)';
+        sidebar.classList.remove('active-sidebar');
         if(sideToggle) sideToggle.innerHTML = '<i data-lucide="menu" class="w-6 h-6"></i>';
-        lucide.createIcons();
+        if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 
     // Hide all tabs

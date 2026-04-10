@@ -72,10 +72,20 @@
         /* Keep Sidebar Square and Flush */
         #sidebar {
             border-radius: 0 !important;
+            transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1) !important;
         }
 
         #sidebar * {
             border-radius: 0 !important;
+        }
+
+        @media (max-width: 1023px) {
+            #sidebar {
+                transform: translateX(-100%) !important;
+            }
+            #sidebar.active-sidebar {
+                transform: translateX(0) !important;
+            }
         }
     </style>
 </head>
@@ -90,7 +100,7 @@
 
     <!-- Fixed Sidebar Navigation -->
     <aside id="sidebar"
-        class="fixed top-0 left-0 lg:relative w-[280px] lg:w-80 bg-[#1A1A1A] h-screen flex flex-col items-start py-12 transition-all duration-500 z-50 shadow-2xl -translate-x-full lg:translate-x-0">
+        class="fixed top-0 left-0 lg:relative w-[280px] lg:w-80 bg-[#1A1A1A] h-screen flex flex-col items-start py-12 z-50 shadow-2xl">
         <!-- Logo Branding -->
         <a href="app.html"
             class="px-8 mb-20 flex items-center space-x-4 group hover:opacity-80 transition-all no-underline">
