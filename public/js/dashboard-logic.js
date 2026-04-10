@@ -377,7 +377,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     if (isAdmin) {
+        // Initial Bookings Sync
         syncDashboardData();
+        
+        // Initial Tab Sync
+        if (typeof window.renderGallery === 'function') window.renderGallery();
+        if (typeof window.renderServicesEditor === 'function') window.renderServicesEditor();
+        if (typeof window.loadRatesToForm === 'function') window.loadRatesToForm();
+
+        // Realtime Subscription
         PencilationDB.subscribeBookings(() => {
             if (typeof syncDashboardData === 'function') syncDashboardData();
         });
